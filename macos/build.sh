@@ -108,7 +108,7 @@ rm -rf "$SITE"/pip "$SITE"/pip-*.dist-info "$SITE/bin" "$PYH/include" "$PYH/shar
 find "$PYH" -name '__pycache__' -type d -prune -exec rm -rf {} +
 echo "light (cloud speech only)" > "$PYH/ready.txt"
 mv "$PYH" "$R/engine/python"
-"$R/engine/python/bin/python3" -c "import numpy, onnxruntime, av, sounddevice, soundcard, websockets; print('   numpy', numpy.__version__, '· onnxruntime', onnxruntime.__version__, '· av', av.__version__)"
+PYTHONDONTWRITEBYTECODE=1 "$R/engine/python/bin/python3" -c "import numpy, onnxruntime, av, sounddevice, soundcard, websockets; print('   numpy', numpy.__version__, '· onnxruntime', onnxruntime.__version__, '· av', av.__version__)"
 # Compiled here once, so the app never writes inside itself (the Mac would then see it as changed): "unchecked-hash"
 # copies are used as they are.
 "$R/engine/python/bin/python3" -m compileall -q -j 0 --invalidation-mode unchecked-hash "$R/engine" >/dev/null || true
@@ -120,7 +120,7 @@ if [ "$SIGN" != "-" ]; then OPTS=(--timestamp --options runtime --entitlements "
 sign() { codesign --force --sign "$SIGN" ${OPTS[@]+"${OPTS[@]}"} "$1"; }
 find "$APP/Contents" -type f \( -perm -0100 -o -name '*.so' -o -name '*.dylib' \) -print0 |
   while IFS= read -r -d '' f; do
-    if file -b "$f" | grep -q 'Mach-O'; then sign "$f"; fi
+    case "$(file -b "$f")" in *Mach-O*) sign "$f" ;; esac
   done
 find "$APP/Contents/Frameworks" -depth -type d \( -name '*.framework' -o -name '*.app' \) -print0 |
   while IFS= read -r -d '' b; do sign "$b"; done
