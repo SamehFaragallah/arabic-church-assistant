@@ -1,0 +1,982 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arabic Church Assistant — Settings</title>
+<link rel="stylesheet" href="styles.css">
+<script src="fonts.js"></script>
+<script>VF_loadCss('ui');</script>
+<style>
+  body { height: auto; min-height: 100%; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 18px; align-items: start; }
+  @media (max-width: 1000px) { .wrap { grid-template-columns: 1fr; } .side { position: static !important; } }
+  .section { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 18px; scroll-margin-top: 12px; }
+  .section > h2 { margin: 0; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 13px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); font-weight: 600; }
+  .row { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 16px; padding: 14px 18px; border-bottom: 1px solid var(--line); align-items: start; }
+  .row:last-child { border-bottom: 0; }
+  @media (max-width: 640px) { .row { grid-template-columns: 1fr; gap: 8px; } }
+  .row > .k { font-weight: 500; }
+  .row > .k small { display: block; color: var(--muted); font-weight: 400; font-size: 12px; margin-top: 2px; }
+  select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 240px; max-width: 100%; }
+  .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .choice { border: 1px solid var(--line); background: var(--panel-2); border-radius: 10px; padding: 12px; cursor: pointer; text-align: start; color: var(--text); }
+  .choice:hover { border-color: #3a4150; }
+  .choice.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .choice b { display: block; font-weight: 600; }
+  .choice span { color: var(--muted); font-size: 12px; }
+  .font-sample { direction: rtl; font-size: 25px; line-height: 1.8; margin: 2px 0 4px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .seg { width: fit-content; display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { background: var(--panel-2); border: 0; border-inline-end: 1px solid var(--line); padding: 7px 14px; cursor: pointer; color: var(--text); }
+  .seg button:last-child { border-inline-end: 0; }
+  .seg button.on { background: var(--gold); color: #1a1408; font-weight: 600; }
+  #transition { display: grid; grid-template-columns: repeat(3, auto); }
+  #transition button { border-bottom: 1px solid var(--line); }
+  #transition button:nth-child(3n) { border-inline-end: 0; }
+  #transition button:nth-last-child(-n+3) { border-bottom: 0; }
+  #transitionSpeed { flex-wrap: wrap; }
+  #transitionSpeed input { width: 200px; }
+  #transitionMsVal { white-space: nowrap; min-width: 52px; }
+  .range { display: flex; align-items: center; gap: 12px; }
+  .range input { width: 240px; accent-color: var(--gold); }
+  .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .side { position: sticky; top: 18px; }
+  .preview { aspect-ratio: 16 / 9; position: relative; overflow: hidden; border-radius: 10px; border: 1px solid var(--line); background: repeating-conic-gradient(#222 0 25%, #2a2a2a 0 50%) 0 0 / 20px 20px; }
+  .preview iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  .saved { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .saved .tick { color: var(--green); opacity: 0; transition: opacity .2s; }
+  .saved.show .tick { opacity: 1; }
+  .hidden { display: none !important; }
+
+  .mics { display: flex; flex-direction: column; gap: 6px; }
+  .mic { display: grid; grid-template-columns: 18px minmax(0, 1fr) 90px; gap: 10px; align-items: center; text-align: start; border: 1px solid var(--line); background: var(--panel-2); border-radius: 9px; padding: 9px 12px; cursor: pointer; color: var(--text); }
+  .mic:hover { border-color: #3a4150; }
+  .mic.on { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold) inset; }
+  .mic .radio { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted); }
+  .mic.on .radio { border-color: var(--gold); background: radial-gradient(var(--gold) 0 3px, transparent 4px); }
+  .mic .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mic .meter { width: 90px; margin: 0; }
+  .statusbox { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 20px; background: var(--panel-2); border: 1px solid var(--line); font-size: 12px; }
+  .pill .d { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .pill.ok .d { background: var(--green); }
+  .pill.busy .d { background: var(--gold); animation: pulse .8s infinite; }
+  .pill.bad .d { background: var(--red); }
+  .plform { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tsearch { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; color: var(--text); font: inherit; }
+  .tlist { margin-top: 8px; max-height: 360px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+  /* each translation: the tick, its initials, and its name with where it comes from underneath (the name gets the room) */
+  .trow { display: grid; grid-template-columns: 16px 74px minmax(0, 1fr); column-gap: 8px; row-gap: 1px; align-items: center; width: 100%; padding: 7px 12px;
+          background: none; border: 0; border-bottom: 1px solid var(--line); color: var(--text); text-align: start; cursor: pointer; font: inherit; }
+  .trow .tick, .trow b { grid-row: 1 / span 2; }
+  .trow .tname, .trow .twhere { grid-column: 3; }
+  .trow:last-child { border-bottom: 0; }
+  .trow:hover { background: rgba(255, 255, 255, .04); }
+  .trow.on { background: var(--gold-soft); }
+  .trow .tick { color: var(--gold); font-weight: 700; }
+  .trow b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .trow .tname { overflow-wrap: anywhere; }
+  .trow .twhere { color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .trow .twhere.need { color: var(--gold); }
+  .tempty { padding: 12px; color: var(--muted); font-size: 12px; }
+  .keybox { margin-top: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+  .ok { color: var(--green); } .bad { color: var(--red); }
+  .keysaved { align-items: center; } .keysaved > span { flex: 1; min-width: 200px; }
+  .keyhint { color: var(--muted); font-size: 12px; margin-inline-start: 4px; }
+  .plform input { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+  .pllist { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .plrow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel-2); font-size: 13px; }
+  .plrow { flex-wrap: wrap; }
+  .plrow b { font-weight: 500; flex: 1 1 220px; line-height: 1.5; }
+  .plrow .n { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .plrow .err { color: var(--red); font-size: 12px; }
+  pre.log { background: #0b0c10; border: 1px solid var(--line); border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto; font: 12px/1.5 ui-monospace, Consolas, monospace; color: #c9c6bf; white-space: pre-wrap; margin: 8px 0 0; direction: ltr; text-align: left; unicode-bidi: plaintext; }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .phrase-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .phrase { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .phrase input, .phrase select, #recordKeepWeeks { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; color: inherit; font: inherit; min-width: 0; }
+  .phrase .ph-text { flex: 3 1 260px; }
+  .phrase .ph-ref { flex: 1 1 130px; }
+  .phrase.off .ph-text { opacity: .5; text-decoration: line-through; }
+</style>
+<style>
+  .inputs { display: flex; flex-direction: column; gap: 6px; }
+  .inputs h4 { margin: 8px 0 2px; font: 600 12px var(--ui); color: var(--muted); letter-spacing: .4px; }
+  .mic .meter-fill.voice { background: linear-gradient(90deg, #2f8f5f, var(--green)); }
+  .pinbox { font: 600 28px/1 ui-monospace, Consolas, monospace; letter-spacing: 6px; color: var(--gold); }
+  .urls { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .urls code { font-size: 13px; padding: 4px 8px; user-select: all; }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <span class="brand-mark">✦</span>
+    <div class="brand-text">
+      <div class="brand-title">Settings</div>
+      <div class="brand-sub">Changes save by themselves (to settings.json in the Arabic Church Assistant folder) and are remembered next time</div>
+    </div>
+  </div>
+  <div class="bar-controls"><a class="btn" href="/" id="backBtn">← Back to the console</a></div>
+</header>
+<div id="banner" class="banner" hidden></div>
+
+<div class="wrap">
+  <main>
+    <section class="section" id="engine">
+      <h2>Listening</h2>
+      <div class="row">
+        <div class="k">Speech engine<small>Turns what is said into text, with the choice under Speech recognition</small></div>
+        <div>
+          <div class="statusbox">
+            <span class="pill" id="engPill"><span class="d"></span><span id="engState">…</span></span>
+            <span class="note" style="margin:0" id="engDetail"></span>
+          </div>
+          <div class="note" id="engMessage"></div>
+          <div class="btnrow">
+            <button class="btn btn-small" id="engRestart">Restart the speech engine</button>
+          </div>
+          <details style="margin-top:10px"><summary class="note" style="cursor:pointer;display:inline">Show the engine log</summary><pre class="log" id="engLog"></pre></details>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Speech recognition<small>Where the speech is turned into text</small></div>
+        <div>
+          <div class="choices" id="speechProvider">
+            <button class="choice" data-v="google"><b>Google</b><span>Free · the usual choice · online, through Google Chrome (must be installed) · hears Arabic and English at once · words appear as they are spoken · skipped more words on our livestream recordings</span></button>
+            <button class="choice" data-v="local"><b>On this PC</b><span>Free · no internet · good on Egyptian Arabic in our tests · needs an NVIDIA graphics card with 6 GB (or a fast processor) · choosing it downloads the model: about 7 GB (4.5 GB without an NVIDIA card)</span></button>
+            <button class="choice" data-v="auto"><b>Automatic</b><span id="autoNote">The model on this PC when it is downloaded and the graphics card is good enough, otherwise Google</span></button>
+            <button class="choice" data-v="elevenlabs"><b>ElevenLabs Scribe Live</b><span>Cloud · about $0.30 an hour while listening · most accurate in our tests · words appear as they are spoken</span></button>
+            <button class="choice" data-v="soniox"><b>Soniox</b><span>Cloud · about $0.12 an hour while listening · words appear as they are spoken · Arabic and English, also mixed in one sentence</span></button>
+            <button class="choice" data-v="deepgram"><b>Deepgram Nova-3</b><span>Cloud · about $0.26 an hour · each sentence is sent when it ends · new accounts get $200 free credit</span></button>
+          </div>
+          <div class="keybox" id="modelBox" hidden>
+            <div class="note" style="margin-top:0" id="modelText"></div>
+            <div id="modelTokenForm" hidden>
+              <div class="note">The model is free, but its page on Hugging Face asks everyone to sign in first:
+                1. make a free account at <a href="https://huggingface.co/join" target="_blank" rel="noopener">huggingface.co</a>;
+                2. open <a href="https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026" target="_blank" rel="noopener">the model's page</a> and accept its terms (accepted straight away);
+                3. make a <i>Read</i> token at <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a> and paste it here.</div>
+              <div class="plform">
+                <input id="hfToken" type="password" autocomplete="off" placeholder="Hugging Face token">
+                <button class="btn btn-small" id="hfSave">Save and download</button>
+              </div>
+            </div>
+            <div class="btnrow">
+              <button class="btn btn-small" id="modelGo" hidden>Download it now</button>
+              <button class="btn btn-small btn-ghost" id="modelStop" hidden>Stop the download</button>
+            </div>
+          </div>
+          <div class="keybox" id="sttBox" hidden>
+            <div class="note" style="margin-top:0" id="sttHelp"></div>
+            <div class="plform keysaved" id="sttSaved" hidden>
+              <span class="ok">✓ Key saved on this PC <span class="keyhint" id="sttHint"></span></span>
+              <button class="btn btn-small" id="sttChange">Change key</button>
+            </div>
+            <div class="plform" id="sttForm">
+              <input id="sttKey" type="password" autocomplete="off" placeholder="API key">
+              <button class="btn btn-small" id="sttSave">Save key</button>
+            </div>
+            <label class="toggle" style="margin-top:10px"><input type="checkbox" id="speechHints"><span class="track"><span class="thumb"></span></span><span>Tell it the Bible book names and hymn titles to expect</span></label>
+            <div class="note">So it spells them the way they are looked for. Soniox charges about a third of a cent for this list each time listening starts or a command is spoken on the phone (in our tests it found every reference without it). ElevenLabs charges about $0.08 an hour more while it is on.</div>
+            <div class="note" id="sttUsage"></div>
+          </div>
+          <div class="note">Google and the cloud services need internet. Google, ElevenLabs and Soniox are sent the sound as it is heard, so the words appear while the pastor is still talking; Deepgram gets each sentence when it ends. If an online service stops answering and the model is installed on this PC, Arabic Church Assistant switches to it by itself.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Listen to<small>Speak, and watch the bar move on the right one</small></div>
+        <div>
+          <div class="inputs">
+            <h4>MICROPHONES</h4>
+            <div class="mics" id="mics"></div>
+            <h4>THIS PC'S SOUND — a video or YouTube playing here, Zoom, a stream</h4>
+            <div class="mics" id="speakers"></div>
+          </div>
+          <div class="note">Best results: feed the pastor's microphone from the sound desk straight into this PC, rather than a microphone in the room. To test with a recording, use <b>Listen to → 📁 Test with a recording</b> in the console.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Language<small>What the pastor speaks</small></div>
+        <div>
+          <div class="seg" id="listenLang">
+            <button data-v="auto">Arabic + English</button>
+            <button data-v="ar">Arabic only</button>
+            <button data-v="en">English only</button>
+          </div>
+          <div class="note">Arabic + English is best: each sentence is written in the language it was spoken in, so English quotes are recognized without switching anything.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">End of a sentence<small>How long a pause ends a sentence</small></div>
+        <div>
+          <div class="range"><input type="range" id="pause" min="0.3" max="1.2" step="0.05"><span id="pauseVal"></span></div>
+          <div class="note">Shorter: verses appear sooner. Longer: fewer sentences cut in two by a breath. 0.5 s suits most preachers.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Voice sensitivity<small>How easily speech is picked up</small></div>
+        <div>
+          <div class="range"><input type="range" id="sensitivity" min="0.2" max="0.8" step="0.05"><span id="sensitivityVal"></span></div>
+          <div class="note">Raise it if quiet speech is missed; lower it if music or the congregation is taken for the pastor.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Run the speech model on</div>
+        <div>
+          <div class="seg" id="speechDevice">
+            <button data-v="auto">Automatic</button>
+            <button data-v="cuda">Graphics card</button>
+            <button data-v="cpu">Processor</button>
+          </div>
+          <div class="note">Automatic uses the NVIDIA graphics card when there is one (fastest), otherwise the processor. Changing it restarts the speech engine.</div>
+        </div>
+      </div>
+      <div class="row" id="record">
+        <div class="k">Record of each service<small>What was heard, shown and when</small></div>
+        <div>
+          <div class="note" style="margin-top:0">Always kept on this PC: every sentence heard, every verse found, everything put on screen with its time and who or what put it
+            there (<b>History</b> tab, <code>data\history</code>), and the app's and speech engine's log (<code>data\logs</code>, 60 days).</div>
+          <div class="btnrow" style="margin:8px 0" id="recordFolders">
+            <button class="btn btn-small" data-folder="history">Open the history folder</button>
+            <button class="btn btn-small" data-folder="logs">Open the log folder</button>
+            <button class="btn btn-small" data-folder="recordings">Open the recordings folder</button>
+          </div>
+          <label class="toggle"><input type="checkbox" id="recordService"><span class="track"><span class="thumb"></span></span><span>Keep a sound recording of what is listened to</span></label>
+          <div class="note">On unless you turn it off. Whatever the app listens to is recorded, and the log says where in the recording each sentence is,
+            so a missed or wrong verse can be checked against what was really said: about 11 MB an hour in <code>data\recordings</code>, removed after
+            <input type="number" id="recordKeepWeeks" min="1" max="52" step="1" style="width:56px"> weeks. Test recordings are not recorded again.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="english">
+      <h2>English</h2>
+      <div class="row">
+        <div class="k">English on screen<small>The translation shown under the Arabic</small></div>
+        <div>
+          <input class="tsearch" id="enSearch" type="search" autocomplete="off" placeholder="Search: NIV, King James, New Living…" aria-label="Search the translations">
+          <div class="tlist" id="enList" role="listbox" aria-label="English translations"><div class="tempty">Getting the list…</div></div>
+          <div class="note" id="enListNote"></div>
+          <div class="note" id="builtInNote"></div>
+
+          <div class="keybox" id="esvBox" hidden>
+            <div class="note" style="margin-top:0" id="esvHelp">The ESV is free for churches: create a free account at
+              <a href="https://api.esv.org/" target="_blank" rel="noopener">api.esv.org</a> → <i>Create an API application</i> → copy the key here.</div>
+            <div class="plform keysaved" id="esvSaved" hidden>
+              <span class="ok">✓ ESV key saved on this PC <span class="keyhint" id="esvHint"></span></span>
+              <button class="btn btn-small" id="esvTest">Test</button>
+              <button class="btn btn-small" id="esvChange">Change key</button>
+            </div>
+            <div class="plform" id="esvForm">
+              <input id="esvKey" type="password" autocomplete="off" placeholder="ESV API key">
+              <button class="btn btn-small" id="esvSave">Save key</button>
+              <button class="btn btn-small" id="esvCancel" hidden>Cancel</button>
+            </div>
+            <div class="note" id="esvStatus"></div>
+          </div>
+
+          <div class="keybox" id="abBox" hidden>
+            <div class="note" style="margin-top:0" id="abHelp">NIV, NKJV and other copyrighted translations come from
+              <a href="https://api.bible/" target="_blank" rel="noopener">API.Bible</a>. Its free Starter plan (non-commercial)
+              includes up to 3 copyrighted translations: add the ones you want to your API.Bible app, then paste the key here. Every translation the key gives then appears in the list above.</div>
+            <div class="plform keysaved" id="abSaved" hidden>
+              <span class="ok">✓ API.Bible key saved on this PC <span class="keyhint" id="abHint"></span></span>
+              <button class="btn btn-small" id="abTest">Test</button>
+              <button class="btn btn-small" id="abChange">Change key</button>
+            </div>
+            <div class="plform" id="abForm">
+              <input id="abKey" type="password" autocomplete="off" placeholder="API.Bible key">
+              <button class="btn btn-small" id="abSave">Save key</button>
+              <button class="btn btn-small" id="abCancel" hidden>Cancel</button>
+            </div>
+            <div class="note" id="abStatus"></div>
+          </div>
+          <div class="note">Whatever is chosen here, English quotes are recognized using all the built-in translations, so NIV / ESV / NKJV-style wording is still found.
+            The translation's initials are shown after each English verse, as the publishers ask.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">English quotes<small>When the pastor quotes a verse in English</small></div>
+        <div><label class="toggle"><input type="checkbox" id="englishForEnglish"><span class="track"><span class="thumb"></span></span><span>Show the Arabic verse with the English underneath</span></label></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Detection</h2>
+      <div class="row">
+        <div class="k">Auto-show<small>Put spoken references on screen without clicking Show</small></div>
+        <div><label class="toggle"><input type="checkbox" id="autoShow"><span class="track"><span class="thumb"></span></span><span>On</span></label></div>
+      </div>
+      <div class="row">
+        <div class="k">Follow the reading<small>The pastor reads on into the next verse</small></div>
+        <div>
+          <label class="toggle"><input type="checkbox" id="readAlong"><span class="track"><span class="thumb"></span></span><span>When a verse is on screen and the next verse is being read, show it</span></label>
+          <div class="note">Works from the words themselves, so it follows a passage read straight through without anyone saying “the next verse”.
+            When one sentence runs across two verses both are shown, so no verse is skipped.</div>
+          <label class="toggle" style="margin-top:10px"><input type="checkbox" id="readEnd"><span class="track"><span class="thumb"></span></span><span>In a reading, move on as each verse ends</span></label>
+          <div class="note">In a passage that was announced, or after three verses in a row, the next verse goes up as the one on screen ends, so the screen keeps
+            pace with the reader instead of trailing a verse behind. If he stops reading there, the screen goes back to the verse he ended on. At the last verse of a chapter the screen stays: it does not go on into the next chapter by itself.</div>
+          <div class="range" style="margin-top:10px"><input type="range" id="readLead" min="0" max="3" step="0.25"><span id="readLeadVal"></span></div>
+          <div class="note">How long before the end of a verse the next one goes up. At 0 it waits for the verse's last word; at 1 second it goes up about
+            two words earlier, while the last words are still being read.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Follow “next verse”<small>«العدد اللي بعده» · «اللي بعده» · “next verse”</small></div>
+        <div>
+          <label class="toggle"><input type="checkbox" id="navFollow"><span class="track"><span class="thumb"></span></span><span>When a verse is on screen, move to the next (or previous) one by itself</span></label>
+          <div class="note">A plain «اللي بعده» only counts while you are reading scripture, and not in sentences like «اليوم اللي بعده».</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Catch quotes<small>Suggest verses quoted without naming them</small></div>
+        <div><label class="toggle"><input type="checkbox" id="catchQuotes"><span class="track"><span class="thumb"></span></span><span>On</span></label></div>
+      </div>
+      <div class="row">
+        <div class="k">Auto-show quotes<small>Verses recognized from a quote, Arabic or English</small></div>
+        <div>
+          <label class="toggle"><input type="checkbox" id="autoShowQuotes"><span class="track"><span class="thumb"></span></span><span>Put them on screen without clicking Show</span></label>
+          <div class="note">Off by default: a quote is recognized from a few words, so now and then it can be the wrong verse. Only clear quotes go on screen by themselves: about six words of the verse in a row, or five when hardly another verse has them («الرب راعي فلا يعوزني شيء»). A verse that is quoted again after it has left the screen comes back.</div>
+          <label class="toggle" style="margin-top:10px"><input type="checkbox" id="quoteLive"><span class="track"><span class="thumb"></span></span><span>Show a quote while it is still being said</span></label>
+          <div class="note">On: a clear quote goes up as soon as enough of the verse has been said (about six words), while the speaker is still in it. Off: it goes up when he finishes the sentence. Only for quotes that go on screen by themselves (the switch above).</div>
+          <div class="note" id="cardOnlyNote" hidden></div>
+        </div>
+      </div>
+      <div class="row" id="phrases">
+        <div class="k">Set prayers<small>Words said in every service</small></div>
+        <div>
+          <div class="note" style="margin-top:0">A formula or prayer that is said every week is not a quotation: «باسم الآب والابن والروح القدس» should not bring up Matthew 28:19.
+            List them here. Each is known by its first five words (small slips in spelling are allowed).</div>
+          <div id="phraseList" class="phrase-list"></div>
+          <div class="btnrow" style="margin-top:8px">
+            <button class="btn btn-small" id="phraseAdd">＋ Add one</button>
+            <button class="btn btn-small btn-primary" id="phraseSave">Save</button>
+            <button class="btn btn-small btn-ghost" id="phraseReset">Back to the built-in list</button>
+            <span class="note" id="phraseStatus" style="margin:0 0 0 8px"></span>
+          </div>
+          <div class="note"><b>Ignore</b>: its words are left out when quotes are looked for. <b>Card only</b>: a card for its verse, never on screen by itself.
+            <b>Show passage</b>: its passage goes on screen like a clear quote (when Auto-show quotes is on).</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="videos">
+      <h2>YouTube videos</h2>
+      <div class="row">
+        <div class="k">Playlists<small>The video titles are saved on this PC</small></div>
+        <div>
+          <form id="plForm" class="plform">
+            <input id="plInput" dir="ltr" placeholder="Paste a YouTube playlist (or single video) link">
+            <button class="btn btn-small" id="plAdd" type="submit">Add</button>
+          </form>
+          <div id="plList" class="pllist"></div>
+          <div class="note">When the speaker says one of the titles («هنرنم ترنيمة …»), the video shows up highlighted in the console, ready to play on the display.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Detect titles<small>Listen for the playlist titles</small></div>
+        <div><label class="toggle"><input type="checkbox" id="videoDetect"><span class="track"><span class="thumb"></span></span><span>On</span></label></div>
+      </div>
+      <div class="row">
+        <div class="k">Play automatically<small>Off by default</small></div>
+        <div>
+          <label class="toggle"><input type="checkbox" id="videoAutoPlay"><span class="track"><span class="thumb"></span></span><span>Play on the display as soon as a hymn from your playlists is announced (also on the console's top bar)</span></label>
+          <div class="note">It plays by itself only when the speaker says that we are about to sing or hear it: «خلونا نرنم مع بعض ترنيمة …», «تعالوا نسبح ونقول …», «نسمع ترنيمة …», “let's sing …”.
+            A first line said in a prayer, a title on its own, or a hymn quoted in the sermon («فيه ترنيمة بتقول …») only makes a card with a Play button. A hymn that is announced but is not in your
+            playlists never plays by itself: its card lists what the song database (Videos tab) has by that name.</div>
+          <label class="toggle" style="margin-top:10px"><input type="checkbox" id="videoPlayOnce"><span class="track"><span class="thumb"></span></span><span>A hymn that has played by itself is not played again by itself</span></label>
+          <div class="note">When its title is mentioned again later in the service, its card comes to the top and <b>Play</b> starts it. Turn this off to have it play
+            every time it is announced. It starts afresh each time Arabic Church Assistant is opened.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Display</h2>
+      <div class="row">
+        <div class="k">Arabic font</div>
+        <div class="choices" id="fonts"></div>
+      </div>
+      <div class="row">
+        <div class="k">Tashkeel<small>Diacritics, as printed in the Van Dyke Bible</small></div>
+        <div>
+          <label class="toggle"><input type="checkbox" id="tashkeel"><span class="track"><span class="thumb"></span></span><span>Show tashkeel</span></label>
+          <div class="note" id="tashkeelNote"></div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Layout</div>
+        <div class="seg" id="layout">
+          <button data-v="full">Full screen</button>
+          <button data-v="lower">Lower third</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">Background</div>
+        <div class="seg" id="background">
+          <button data-v="dark">Dark</button>
+          <button data-v="black">Black</button>
+          <button data-v="light">Light</button>
+          <button data-v="transparent">Transparent</button>
+          <button data-v="green">Green screen</button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="k">English underneath<small>The translation chosen under English</small></div>
+        <div><label class="toggle"><input type="checkbox" id="showEnglish"><span class="track"><span class="thumb"></span></span><span>On</span></label></div>
+      </div>
+      <div class="row">
+        <div class="k">Text size</div>
+        <div class="range"><input type="range" id="textSize" min="0.6" max="1.6" step="0.05"><span id="textSizeVal"></span></div>
+      </div>
+      <div class="row">
+        <div class="k">Between verses<small>How one verse changes to the next on screen</small></div>
+        <div>
+          <div class="seg" id="transition">
+            <button data-v="rise">Fade + rise</button>
+            <button data-v="fade">Fade</button>
+            <button data-v="slideup">Slide up</button>
+            <button data-v="slide">Slide sideways</button>
+            <button data-v="zoom">Zoom</button>
+            <button data-v="none">Instant (no animation)</button>
+          </div>
+          <div class="range" style="margin-top:12px" id="transitionSpeed">
+            <span class="note" style="margin:0">Speed</span>
+            <input type="range" id="transitionMs" min="100" max="2000" step="50">
+            <span id="transitionMsVal"></span>
+            <button class="btn btn-small" id="transitionTry" type="button">▶ Try it in the preview</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="screens">
+      <h2>Display screen</h2>
+      <div class="row only-desktop">
+        <div class="k">Show the display on<small>The projector or TV</small></div>
+        <div>
+          <select id="displayId"><option value="">Automatic: the second screen (projector)</option></select>
+          <div class="note">With only one screen, the display opens as a window you can move. Double-click the display to switch full screen on or off.</div>
+        </div>
+      </div>
+      <div class="row only-desktop">
+        <div class="k">Open the display<small>When Arabic Church Assistant starts</small></div>
+        <div><label class="toggle"><input type="checkbox" id="displayAutoOpen"><span class="track"><span class="thumb"></span></span><span>On</span></label></div>
+      </div>
+      <div class="row">
+        <div class="k">Reference above the verse<small>«يوحنا ٣: ١٦»</small></div>
+        <div><label class="toggle"><input type="checkbox" id="showReference"><span class="track"><span class="thumb"></span></span><span>Show it</span></label></div>
+      </div>
+    </section>
+
+    <section class="section" id="remote">
+      <h2>Phone remote</h2>
+      <div class="row">
+        <div class="k">Control from a phone<small>Next / previous verse, clear the screen, listening on or off</small></div>
+        <div>
+          <div class="note" style="margin-top:0">On a phone connected to the same Wi-Fi as this PC, open:</div>
+          <div class="urls" id="remoteUrls"><code>…</code></div>
+          <div class="note">and enter this PIN:</div>
+          <div class="pinbox" id="remotePin">····</div>
+          <div class="note">The PIN keeps people on the church Wi-Fi from changing the screen. It is only shown here, on this PC.
+            The phone shows a security warning the first time (the address is this PC's own): choose <i>Advanced → Proceed</i>. It is needed for <b>Hold to speak</b>.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="about">
+      <h2>About</h2>
+      <div class="row">
+        <div class="k">Arabic Church Assistant<small id="aboutVersion"></small></div>
+        <div>
+          <div class="note" style="margin-top:0">Made by <b>Sameh Welson Faragallah</b>.</div>
+          <div class="note">Free to download and share with other churches. The newest version is at
+            <a href="https://github.com/SamehFaragallah/arabic-church-assistant/releases/latest" target="_blank" rel="noopener">github.com/SamehFaragallah/arabic-church-assistant</a>.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <aside class="side">
+    <section class="section">
+      <h2>Preview</h2>
+      <div style="padding:14px">
+        <div class="preview" id="previewBox"><iframe id="preview" src="/display?sample=1&amp;embed=1" title="Display preview" tabindex="-1"></iframe></div>
+        <div class="note">Every display (projector, OBS) changes as soon as you change a setting here.</div>
+        <div class="saved" id="saved"><span class="tick">✓</span><span>Saved to <code>settings.json</code> in the Arabic Church Assistant folder</span></div>
+      </div>
+    </section>
+  </aside>
+</div>
+
+<script src="engine.js"></script>
+<script>
+(function () {
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const desktop = window.vfDesktop || null;
+  let s = {};
+  const keyEditing = { esv: false, ab: false };
+  function banner(msg) { const b = $('#banner'); b.innerHTML = msg || ''; b.hidden = !msg; }
+  document.querySelectorAll('.only-desktop').forEach(e => e.classList.toggle('hidden', !desktop));
+  if (window.opener || desktop) { $('#backBtn').textContent = 'Close settings'; $('#backBtn').onclick = e => { e.preventDefault(); window.close(); }; }
+
+  // ---------------------------------------------------------------- save
+  let saveTimer = null, pending = {};
+  function set(k, v) {
+    s[k] = v;
+    pending[k] = v;
+    render();
+    $('#preview').contentWindow.postMessage({ vfSettings: s }, location.origin);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(save, 250);
+  }
+  async function save() {
+    const body = pending; pending = {};
+    try {
+      const r = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'HTTP ' + r.status);
+      banner('');
+      const el = $('#saved'); el.classList.add('show'); setTimeout(() => el.classList.remove('show'), 1500);
+    } catch (e) { banner('Could not save: ' + esc(e.message)); }
+  }
+
+  // ---------------------------------------------------------------- fonts
+  for (const [key, f] of Object.entries(window.VF_FONTS)) {
+    window.VF_loadFont(key);
+    const b = document.createElement('button');
+    b.className = 'choice'; b.dataset.v = key;
+    b.innerHTML = '<b></b><div class="font-sample"></div><span></span>';
+    b.querySelector('b').textContent = f.label;
+    b.querySelector('span').textContent = f.note;
+    b.querySelector('.font-sample').style.fontFamily = `"${f.name}", serif`;
+    $('#fonts').appendChild(b);
+  }
+  const SAMPLE = 'لِأَنَّهُ هَكَذَا أَحَبَّ ٱللَّهُ ٱلْعَالَمَ';
+  function renderFontSamples() {
+    const t = s.tashkeel === false ? window.VerseEngine.stripTashkeel(SAMPLE) : SAMPLE;
+    document.querySelectorAll('.font-sample').forEach(el => { el.textContent = t; });
+  }
+
+  // ---------------------------------------------------------------- generic controls
+  function wireChoices(id, key) {
+    $('#' + id).addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) set(key, b.dataset.v); });
+  }
+  wireChoices('fonts', 'font');
+  wireChoices('layout', 'layout');
+  wireChoices('background', 'background');
+  wireChoices('transition', 'transition');
+  wireChoices('listenLang', 'listenLang');
+  wireChoices('speechDevice', 'speechDevice');
+  wireChoices('speechProvider', 'speechProvider');
+  const STT = { elevenlabs: { key: 'elevenlabsKey', help: 'Create a free account at <a href="https://elevenlabs.io/app/settings/api-keys" target="_blank" rel="noopener">elevenlabs.io</a> → API keys → Create, give it the Speech to Text permission, and paste the key here.' },
+    soniox: { key: 'sonioxKey', help: 'Create an account at <a href="https://console.soniox.com/" target="_blank" rel="noopener">console.soniox.com</a>, add funds (Billing), then API Keys → create one, and paste it here. It is charged by the hour of listening: about $0.12.' },
+    deepgram: { key: 'deepgramKey', help: 'Create a free account at <a href="https://console.deepgram.com/" target="_blank" rel="noopener">console.deepgram.com</a> (it comes with $200 of free credit) → API Keys → Create a New API Key, and paste it here.' } };
+  let sttEditing = false;
+  $('#sttChange').onclick = () => { sttEditing = true; render(); $('#sttKey').focus(); };
+  $('#sttSave').onclick = async () => {
+    const p = STT[s.speechProvider]; const v = $('#sttKey').value.trim();
+    if (!p || !v) return;
+    const r = await fetch('/api/english/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [p.key]: v }) });
+    if (r.ok) { s = Object.assign(s, await r.json()); sttEditing = false; $('#sttKey').value = ''; render(); }
+  };
+  $('#transitionMs').oninput = e => set('transitionMs', parseInt(e.target.value, 10));
+  const replay = () => $('#preview').contentWindow.postMessage({ vfReplay: true }, location.origin);
+  $('#transitionTry').onclick = replay;
+  $('#transition').addEventListener('click', e => { if (e.target.closest('[data-v]')) setTimeout(replay, 60); });
+  $('#preview').addEventListener('load', () => $('#preview').contentWindow.postMessage({ vfSettings: s }, location.origin));
+  const TOGGLES = ['autoShow', 'autoShowQuotes', 'quoteLive', 'catchQuotes', 'speechHints', 'showEnglish', 'tashkeel', 'videoDetect', 'videoAutoPlay', 'videoPlayOnce', 'englishForEnglish',
+    'navFollow', 'readAlong', 'readEnd', 'recordService', 'displayAutoOpen', 'showReference'];
+  for (const k of TOGGLES) $('#' + k).onchange = e => set(k, e.target.checked);
+  $('#textSize').oninput = e => set('textSize', parseFloat(e.target.value));
+  $('#pause').oninput = e => set('pause', parseFloat(e.target.value));
+  $('#sensitivity').oninput = e => set('sensitivity', parseFloat(e.target.value));
+  const leadText = v => (+v ? String(+v) + ' s before the end' : 'at the last word');
+  $('#readLead').oninput = e => { set('readLead', parseFloat(e.target.value)); $('#readLeadVal').textContent = leadText(e.target.value); };
+  $('#displayId').onchange = e => set('displayId', e.target.value);
+  const mark = (id, v) => document.querySelectorAll('#' + id + ' [data-v]').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  const DEFAULT_ON = new Set(['catchQuotes', 'quoteLive', 'speechHints', 'videoDetect', 'videoPlayOnce', 'englishForEnglish', 'navFollow', 'readAlong', 'readEnd', 'displayAutoOpen', 'showReference', 'tashkeel']);
+  $('#recordKeepWeeks').onchange = e => set('recordKeepWeeks', Math.min(52, Math.max(1, parseInt(e.target.value, 10) || 8)));
+  document.querySelectorAll('#recordFolders [data-folder]').forEach(b => {
+    b.onclick = () => (window.vfDesktop ? window.vfDesktop.openFolder(b.dataset.folder) : banner('It is the data\\' + b.dataset.folder + ' folder inside the Arabic Church Assistant folder.'));
+  });
+
+  // ---------------------------------------------------------------- set prayers and formulas (data\phrases.json)
+  let phrases = [];
+  function renderPhrases() {
+    const box = $('#phraseList');
+    box.innerHTML = '';
+    phrases.forEach((ph, i) => {
+      const row = document.createElement('div');
+      row.className = 'phrase' + (ph.off ? ' off' : '');
+      row.innerHTML = '<input class="ph-text" dir="auto" placeholder="The words, as they are said"><select class="ph-action"><option value="ignore">Ignore</option>' +
+        '<option value="card">Card only</option><option value="show">Show passage</option></select><input class="ph-ref" dir="auto" placeholder="Verse: Matthew 6:9-13">' +
+        '<button class="btn btn-small btn-ghost ph-off"></button><button class="btn btn-small btn-ghost ph-del" title="Remove">✕</button>';
+      const text = row.querySelector('.ph-text'), action = row.querySelector('.ph-action'), ref = row.querySelector('.ph-ref'), off = row.querySelector('.ph-off');
+      text.value = ph.text || ''; action.value = ph.action || 'ignore'; ref.value = ph.ref || '';
+      ref.hidden = action.value === 'ignore';
+      off.textContent = ph.off ? 'Turn on' : 'Turn off';
+      text.oninput = () => { ph.text = text.value; };
+      ref.oninput = () => { ph.ref = ref.value; };
+      action.onchange = () => { ph.action = action.value; ref.hidden = action.value === 'ignore'; };
+      off.onclick = () => { ph.off = !ph.off; renderPhrases(); };
+      row.querySelector('.ph-del').onclick = () => { phrases.splice(i, 1); renderPhrases(); };
+      box.appendChild(row);
+    });
+  }
+  async function loadPhrases() {
+    try { const r = await (await fetch('/api/phrases', { cache: 'no-store' })).json(); phrases = (r.phrases || []).map(x => Object.assign({}, x)); renderPhrases(); $('#phraseReset').hidden = !r.custom; }
+    catch { $('#phraseStatus').textContent = 'Could not read the list.'; }
+  }
+  async function sendPhrases(body) {
+    const st = $('#phraseStatus');
+    try {
+      const r = await fetch('/api/phrases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+      phrases = (j.phrases || []).map(x => Object.assign({}, x)); renderPhrases(); $('#phraseReset').hidden = !j.custom;
+      st.textContent = '✓ Saved'; setTimeout(() => { st.textContent = ''; }, 2500);
+    } catch (e) { st.textContent = e.message; }
+  }
+  $('#phraseAdd').onclick = () => { phrases.push({ text: '', action: 'ignore' }); renderPhrases(); const all = document.querySelectorAll('.ph-text'); all[all.length - 1].focus(); };
+  $('#phraseSave').onclick = () => sendPhrases({ phrases });
+  $('#phraseReset').onclick = () => { if (confirm('Go back to the built-in list of set prayers? Your changes to the list are removed.')) sendPhrases({ reset: true }); };
+  loadPhrases();
+
+  function render() {
+    mark('fonts', s.font);
+    mark('layout', s.layout);
+    mark('background', s.background);
+    mark('listenLang', s.listenLang || 'auto');
+    mark('speechDevice', s.speechDevice || 'auto');
+    mark('speechProvider', s.speechProvider || 'google');
+    renderModel();
+    const stt = STT[s.speechProvider];
+    $('#sttBox').hidden = !stt;
+    if (stt) {
+      const isSet = s[stt.key + 'Set'], hint = s[stt.key + 'Hint'];
+      $('#sttHelp').innerHTML = stt.help;
+      $('#sttSaved').hidden = !isSet || sttEditing;
+      $('#sttForm').hidden = isSet && !sttEditing;
+      $('#sttHelp').hidden = isSet && !sttEditing;
+      $('#sttHint').textContent = hint ? `(ends in …${hint})` : '';
+    }
+    for (const k of TOGGLES) $('#' + k).checked = s[k] == null ? DEFAULT_ON.has(k) : !!s[k];
+    if (document.activeElement !== $('#recordKeepWeeks')) $('#recordKeepWeeks').value = s.recordKeepWeeks || 8;
+    const only = Array.isArray(s.cardOnly) ? s.cardOnly : [];
+    $('#cardOnlyNote').hidden = !only.length;
+    if (only.length) {
+      const names = only.map(k => { const [b, c, v] = k.split(':').map(Number); try { return window.VerseEngine.refLabel({ book: b, chapter: c, verse: v }, { lang: 'en' }); } catch { return k; } });
+      $('#cardOnlyNote').innerHTML = `<b>Card only</b> (quoted words never put these on screen by themselves; set with the “Card only” button on a card): ${names.map(esc).join(', ')}. <button class="btn btn-small btn-ghost" id="cardOnlyClear">Clear this list</button>`;
+      $('#cardOnlyClear').onclick = () => set('cardOnly', []);
+    }
+    $('#pause').value = s.pause != null ? s.pause : 0.5;
+    $('#pauseVal').textContent = (+$('#pause').value).toFixed(2) + ' s';
+    $('#sensitivity').value = s.sensitivity != null ? s.sensitivity : 0.5;
+    $('#sensitivityVal').textContent = Math.round(+$('#sensitivity').value * 100) + '%';
+    if (document.activeElement !== $('#readLead')) $('#readLead').value = s.readLead != null ? s.readLead : 1;
+    $('#readLeadVal').textContent = leadText($('#readLead').value);
+    $('#esvBox').hidden = s.englishVersion !== 'esv';
+    $('#abBox').hidden = s.englishVersion !== 'apibible' && !!s.apiBibleKeySet;     // (without a key: how to get NIV, NKJV…)
+    for (const [p, isSet, hint, builtIn] of [['esv', s.esvKeySet, s.esvKeyHint, s.esvKeyBuiltIn], ['ab', s.apiBibleKeySet, s.apiBibleKeyHint, s.apiBibleKeyBuiltIn]]) {
+      const editing = !!keyEditing[p];
+      $(`#${p}Saved`).hidden = !isSet || editing;
+      $(`#${p}Form`).hidden = isSet && !editing;
+      $(`#${p}Help`).hidden = isSet && !editing;
+      $(`#${p}Cancel`).hidden = !isSet;
+      $(`#${p}Hint`).textContent = builtIn ? '(it comes with the app; Change key uses your own instead)' : hint ? `(ends in …${hint})` : '';
+      $(`#${p}Key`).placeholder = isSet ? 'Paste the new key' : (p === 'esv' ? 'ESV API key' : 'API.Bible key');
+    }
+    renderEnglishList();
+    $('#textSize').value = s.textSize;
+    $('#textSizeVal').textContent = Math.round(s.textSize * 100) + '%';
+    mark('transition', s.transition || 'rise');
+    $('#transitionMs').value = s.transitionMs != null ? s.transitionMs : 450;
+    $('#transitionMsVal').textContent = ((s.transitionMs != null ? s.transitionMs : 450) / 1000).toFixed(2).replace(/0$/, '') + ' s';
+    $('#transitionSpeed').style.opacity = s.transition === 'none' ? .45 : 1;
+    if ($('#displayId').value !== (s.displayId || '')) $('#displayId').value = s.displayId || '';
+    renderFontSamples();
+    renderInputs();
+  }
+
+  // ---------------------------------------------------------------- what to listen to (with a live level bar)
+  let devices = { mics: [], speakers: [] }, eng = {}, level = { db: -100, speech: 0 };
+  function renderInputs() {
+    const kind = s.inputKind || 'mic';
+    const defMic = devices.mics.find(m => m.default), defSpk = devices.speakers.find(x => x.default);
+    const mics = [{ name: '', label: 'Windows default microphone' + (defMic ? ` (${defMic.name})` : '') }].concat(devices.mics.map(m => ({ name: m.name, label: m.name })));
+    if (s.micName && !devices.mics.some(m => m.name === s.micName)) mics.push({ name: s.micName, label: s.micName + ' (not connected right now)' });
+    const spk = [{ name: '', label: 'Everything this PC plays' + (defSpk ? ` (${defSpk.name})` : '') }].concat(devices.speakers.filter(x => !x.default).map(x => ({ name: x.name, label: x.name })));
+    const draw = (box, items, k, key) => {
+      const sig = JSON.stringify([items, kind, s[key]]);
+      if (box.dataset.sig === sig) return;
+      box.dataset.sig = sig;
+      box.innerHTML = '';
+      for (const it of items) {
+        const b = document.createElement('button');
+        b.className = 'mic' + (kind === k && (s[key] || '') === it.name ? ' on' : '');
+        b.innerHTML = '<span class="radio"></span><span class="name"></span><span class="meter"><span class="meter-fill"></span></span>';
+        b.querySelector('.name').textContent = it.label;
+        b.onclick = async () => {
+          s.inputKind = k; s[key] = it.name; render();
+          try { await fetch('/api/speech/input', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: k, name: it.name }) }); } catch { /* the banner shows it */ }
+        };
+        box.appendChild(b);
+      }
+    };
+    draw($('#mics'), mics, 'mic', 'micName');
+    draw($('#speakers'), spk, 'loopback', 'speakerName');
+  }
+  let lvl = 0;
+  function meterLoop() {
+    requestAnimationFrame(meterLoop);
+    const pct = Math.max(0, Math.min(1, (level.db + 60) / 54));
+    lvl = pct > lvl ? pct : lvl * 0.9 + pct * 0.1;
+    document.querySelectorAll('.mics .meter-fill').forEach(f => { f.style.width = '0%'; });
+    const on = document.querySelector('.mics .mic.on .meter-fill');
+    if (on) { on.style.width = (lvl * 100).toFixed(1) + '%'; on.classList.toggle('voice', level.speech > 0.5); }
+  }
+
+  // ---------------------------------------------------------------- the speech engine
+  function renderEngine() {
+    const st = eng || {};
+    const words = { 'not-installed': 'Not installed', stopped: 'Stopped', starting: 'Starting…', loading: 'Loading the model…', ready: 'Ready', listening: 'Listening', error: 'Problem', 'no-model': 'No speech model' };
+    $('#engState').textContent = words[st.state] || st.state || '…';
+    $('#engPill').className = 'pill ' + ({ listening: 'ok', ready: 'ok', starting: 'busy', loading: 'busy', error: 'bad', 'not-installed': 'bad', 'no-model': 'bad' }[st.state] || '');
+    const bits = [];
+    if (st.where) bits.push(st.where);
+    if (st.inputState && st.inputState.name) bits.push((st.inputState.kind === 'loopback' ? '🔊 ' : st.inputState.kind === 'file' ? '📁 ' : '🎤 ') + st.inputState.name);
+    if (st.speed && st.device !== 'cloud') bits.push(`${Math.round(1 / Math.max(st.speed, 0.001))}× faster than real time`);
+    $('#engDetail').textContent = bits.join(' · ');
+    $('#engMessage').textContent = st.state === 'error' || st.state === 'loading' || st.state === 'no-model' || st.state === 'not-installed' ? (st.message || '') : '';
+  }
+  function addLog(lines) {
+    const pre = $('#engLog');
+    const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 30;
+    pre.textContent = (pre.textContent === '(nothing yet)' ? '' : pre.textContent + '\n') + lines.join('\n');
+    if (pre.textContent.length > 60000) pre.textContent = pre.textContent.slice(-50000);
+    if (atBottom) pre.scrollTop = pre.scrollHeight;
+  }
+  $('#engRestart').onclick = async () => { $('#engRestart').disabled = true; try { await fetch('/api/speech/restart', { method: 'POST' }); } finally { setTimeout(() => { $('#engRestart').disabled = false; }, 3000); } };
+
+  // ---------------------------------------------------------------- screens (desktop app)
+  async function loadDisplays() {
+    if (!desktop) return;
+    const list = await desktop.displays();
+    const sel = $('#displayId');
+    sel.innerHTML = '<option value="">Automatic: the second screen (projector)</option>';
+    for (const d of list) { const o = document.createElement('option'); o.value = d.id; o.textContent = d.label; sel.appendChild(o); }
+    sel.value = s.displayId || '';
+  }
+
+  // ---------------------------------------------------------------- English keys (ESV / API.Bible)
+  async function saveKey(field, value, statusEl) {
+    const r = await fetch('/api/english/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: value }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) {
+      keyEditing[field === 'esvKey' ? 'esv' : 'ab'] = false;
+      s = Object.assign(s, j); render();
+      statusEl.innerHTML = '<span class="ok">✓ Key saved in settings.json. The app remembers it from now on.</span>';
+    }
+    else statusEl.innerHTML = '<span class="bad">' + esc(j.error || 'Could not save the key') + '</span>';
+  }
+  for (const p of ['esv', 'ab']) {
+    $(`#${p}Change`).onclick = () => { keyEditing[p] = true; render(); $(`#${p}Key`).focus(); };
+    $(`#${p}Cancel`).onclick = () => { keyEditing[p] = false; $(`#${p}Key`).value = ''; render(); };
+    $(`#${p}Key`).onkeydown = e => { if (e.key === 'Enter') $(`#${p}Save`).click(); };
+  }
+  async function testEnglish(statusEl) {
+    statusEl.textContent = 'Testing…';
+    await new Promise(r => setTimeout(r, 400));   // let a just-changed choice reach the server
+    const j = await (await fetch('/api/english/test', { method: 'POST' })).json().catch(() => ({ ok: false, error: 'no answer' }));
+    statusEl.innerHTML = j.ok ? `<span class="ok">✓ Works — John 3:16 (${esc(j.version)}): “${esc(j.text.slice(0, 90))}…”</span>` : `<span class="bad">✗ ${esc(j.error)}</span>`;
+  }
+  $('#esvSave').onclick = () => { const v = $('#esvKey').value.trim(); if (v) saveKey('esvKey', v, $('#esvStatus')).then(() => { $('#esvKey').value = ''; loadEnglishList(); }); };
+  $('#esvTest').onclick = () => testEnglish($('#esvStatus'));
+  $('#abSave').onclick = () => { const v = $('#abKey').value.trim(); if (v) saveKey('apiBibleKey', v, $('#abStatus')).then(() => { $('#abKey').value = ''; loadEnglishList(); }); };
+
+  // ---------------------------------------------------------------- English on screen: every translation in one list
+  let enList = null, enLoading = false, enScrolled = false;
+  const enNorm = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const enChosen = it => (it.v === 'apibible' ? s.englishVersion === 'apibible' && s.apiBibleId === it.id : (s.englishVersion || 'kjv') === it.v);
+  async function loadEnglishList(refresh) {
+    enLoading = true;
+    try {
+      const r = await fetch('/api/english/list' + (refresh ? '?refresh=1' : ''));
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      enList = await r.json();
+    } catch (e) { if (!enList) $('#enList').innerHTML = '<div class="tempty">Could not get the list (' + esc(e.message) + ').</div>'; }
+    enLoading = false;
+    renderEnglishList();
+  }
+  function renderEnglishList() {
+    const L = enList;
+    if (!L) return;
+    if (!enLoading && (L.apiBibleKey !== !!s.apiBibleKeySet || L.esvKey !== !!s.esvKeySet)) { loadEnglishList(); return; }   // a key was saved or changed
+    const words = enNorm($('#enSearch').value).split(' ').filter(Boolean);
+    const box = $('#enList'), top = box.scrollTop;
+    box.innerHTML = '';
+    let shown = 0, chosenRow = null;
+    for (const it of L.items) {
+      // the same initials and name more than once (API.Bible has editions: Protestant, Catholic…): say which
+      const twins = L.items.filter(x => x.abbr === it.abbr && x.name === it.name).length > 1;
+      const name = it.name + (twins && it.desc ? ' · ' + it.desc : '');
+      const hay = enNorm(it.abbr + ' ' + name);
+      if (words.length && !words.every(w => hay.includes(w))) continue;
+      shown++;
+      const on = enChosen(it);
+      const need = (it.where === 'esv' && !L.esvKey);
+      const where = it.where === 'pc' ? (it.ready === false ? 'On this PC · still downloading' : 'On this PC · free · offline')
+        : it.where === 'esv' ? (need ? 'Online · needs a free ESV key' : 'Online · ESV') : 'Online · API.Bible';
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'trow' + (on ? ' on' : ''); b.setAttribute('role', 'option'); b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.innerHTML = `<span class="tick">${on ? '✓' : ''}</span><b>${esc(it.abbr)}</b><span class="tname" title="${esc(name)}">${esc(name)}</span><span class="twhere${need ? ' need' : ''}">${esc(where)}</span>`;
+      b.onclick = () => pickEnglish(it);
+      box.appendChild(b);
+      if (on) chosenRow = b;
+    }
+    if (!shown) box.innerHTML = `<div class="tempty">No translation matches “${esc($('#enSearch').value.trim())}”.</div>`;
+    box.scrollTop = top;
+    if (chosenRow && !enScrolled) { enScrolled = true; box.scrollTop = Math.max(0, chosenRow.offsetTop - box.offsetTop - 60); }   // (the chosen one in view, once)
+    const online = L.items.filter(x => x.where === 'apibible').length, when = L.apiBibleCheckedAt ? new Date(L.apiBibleCheckedAt).toLocaleDateString() : '';
+    $('#enListNote').innerHTML = `${L.items.length} translations: ${L.items.filter(x => x.where === 'pc').length} on this PC, the ESV` +
+      (L.apiBibleKey ? `, and ${online} through your API.Bible key${when ? ' (list from ' + esc(when) + ')' : ''}.` : '. Add a free API.Bible key below for NIV, NKJV, NLT and many more.') +
+      (L.apiBibleError ? ` <span class="bad">Could not ask API.Bible just now: ${esc(L.apiBibleError)}</span>` : '') +
+      (L.apiBibleKey ? ' <a href="#" id="enRefresh">Check again</a>' : '');
+    const again = $('#enRefresh');
+    if (again) again.onclick = e => { e.preventDefault(); $('#enListNote').textContent = 'Asking API.Bible…'; loadEnglishList(true); };
+  }
+  // a translation picked: saved straight away, and an online one is tried at once (John 3:16), so a key or a plan that
+  // does not include it shows up here and not in the middle of a service
+  async function pickEnglish(it) {
+    const upd = it.v === 'apibible' ? { englishVersion: 'apibible', apiBibleId: it.id, apiBibleAbbr: it.abbr } : { englishVersion: it.v };
+    Object.assign(s, upd); Object.assign(pending, upd);
+    render();
+    $('#preview').contentWindow.postMessage({ vfSettings: s }, location.origin);
+    clearTimeout(saveTimer);
+    await save();
+    if (it.v === 'esv' && s.esvKeySet) testEnglish($('#esvStatus'));
+    if (it.v === 'apibible') testEnglish($('#abStatus'));
+  }
+  $('#enSearch').addEventListener('input', renderEnglishList);
+  $('#enSearch').addEventListener('keydown', e => { if (e.key === 'Escape') { e.target.value = ''; renderEnglishList(); } });
+  $('#abTest').onclick = () => testEnglish($('#abStatus'));
+
+  // ---------------------------------------------------------------- YouTube playlists
+  function renderPlaylists(lib) {
+    const box = $('#plList');
+    box.innerHTML = '';
+    const pls = (lib && lib.playlists) || [];
+    if (!pls.length) { box.innerHTML = '<div class="note" style="margin:0">No playlists yet.</div>'; return; }
+    for (const p of pls) {
+      const row = document.createElement('div');
+      row.className = 'plrow';
+      row.innerHTML = '<b dir="auto"></b><span class="n"></span><span class="err"></span><button class="btn btn-small" title="Read the list again from YouTube">↻ Refresh</button><button class="btn btn-small btn-danger">Remove</button>';
+      row.querySelector('b').textContent = p.title;
+      row.querySelector('.n').textContent = `${(p.videos || []).length} videos` + (p.partial ? ' (newest 15 only)' : '') +
+        (p.fetchedAt ? ' · updated ' + new Date(p.fetchedAt).toLocaleDateString() : '');
+      row.querySelector('.err').textContent = p.error ? '⚠ ' + p.error : '';
+      const [re, rm] = row.querySelectorAll('button');
+      re.onclick = async () => { re.textContent = 'Refreshing…'; await fetch('/api/videos/refresh', { method: 'POST' }); };
+      rm.onclick = () => { if (confirm(`Remove the playlist “${p.title}”?`)) fetch('/api/videos/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: p.id }) }); };
+      box.appendChild(row);
+    }
+  }
+  $('#plForm').onsubmit = async e => {
+    e.preventDefault();
+    const url = $('#plInput').value.trim();
+    if (!url) return;
+    const b = $('#plAdd'); b.disabled = true; b.textContent = 'Loading…';
+    try {
+      const r = await fetch('/api/videos/add', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) banner(esc(j.error || 'Could not add it')); else { $('#plInput').value = ''; banner(''); }
+    } finally { b.disabled = false; b.textContent = 'Add'; }
+  };
+
+  // ---------------------------------------------------------------- load
+  const fitPreview = () => { $('#preview').style.transform = `scale(${$('#previewBox').clientWidth / 1920})`; };
+  window.addEventListener('resize', fitPreview);
+  fetch('/api/status').then(r => r.json()).then(st => {
+    $('#aboutVersion').textContent = 'Version ' + st.version;
+    const missing = Object.entries(st.english || {}).filter(([, have]) => !have).map(([v]) => v.toUpperCase());
+    $('#builtInNote').textContent = missing.length ? `Still downloading: ${missing.join(', ')} (needs internet; restart Arabic Church Assistant if it doesn't finish).` : '';
+    $('#tashkeelNote').textContent = st.bibles && st.bibles.ar === 'plain'
+      ? 'The Arabic text with tashkeel is still downloading (or the download failed). Restart Arabic Church Assistant with internet to get it. Until then the plain text is shown.' : '';
+    const urls = (st.secureAddresses && st.secureAddresses.length ? st.secureAddresses : st.addresses || []).map(a => a + '/remote');
+    $('#remoteUrls').innerHTML = urls.length ? urls.map(u => `<code>${esc(u)}</code>`).join('') : '<span class="note">This PC is not on a network right now.</span>';
+  }).catch(() => {});
+  fetch('/api/remote/pin').then(r => r.json()).then(j => { if (j.pin) $('#remotePin').textContent = j.pin; }).catch(() => {});
+  // what "Automatic" picks on this PC, and why
+  function renderHardware(h) {
+    if (!h || !h.gpuChecked) return;
+    const g = h.gpu;
+    let s = 'This PC: ' + (g ? `${g.name} (${Math.round(g.memMB / 1024)} GB)` : 'no NVIDIA graphics card');
+    if (g && !h.gpuGood) s += ', not suited to the model (it needs 6 GB)';
+    else if (g && !h.localReady) s += ', but the model isn\'t installed';
+    else if (g && h.torchGpu === false) s += ', but the speech engine was installed without graphics-card support (run Setup again)';
+    s += h.auto === 'local' ? ' → the model on this PC' : ' → Google';
+    if (h.auto === 'local' && !(h.gpuGood && h.localReady && h.torchGpu !== false)) s += ' (Google needs Chrome, which isn\'t installed)';
+    $('#autoNote').textContent = s;
+  }
+  // the speech model for this PC: downloaded when "On this PC" is chosen; how far it is, or what it needs
+  let model = null;
+  function renderModel() {
+    if (!model || !s) return;
+    const st = model.state, chosen = s.speechProvider === 'local';
+    const show = st === 'running' || st === 'needs-token' || ((chosen || st === 'done') && (!model.ready || st !== 'idle')) || (st === 'failed' && chosen);
+    $('#modelBox').hidden = !show;
+    if (!show) return;
+    const mb = model.modelMB ? ` (the model: ${model.modelMB.toLocaleString()} of about 3,940 MB)` : '';
+    $('#modelText').innerHTML =
+      st === 'running' ? `<b>Downloading the speech model for this PC…</b> ${esc(model.step || '')}${mb}. It can take 10 to 30 minutes; Google listens until it is ready.`
+      : st === 'needs-token' ? '<b>The speech model needs a Hugging Face sign-in before it can be downloaded.</b> Google listens until then.'
+      : st === 'failed' ? `<b>The model download stopped.</b> ${esc(model.error || '')} Google listens until then.`
+      : st === 'done' ? '<b>The speech model is ready.</b> It is used from the next time listening starts.'
+      : '<b>The speech model is not on this PC yet.</b> About 4 GB, plus PyTorch (3 GB with an NVIDIA card, 0.2 GB without). Google listens until it is ready.';
+    $('#modelTokenForm').hidden = st !== 'needs-token';
+    $('#modelGo').hidden = st === 'running' || st === 'needs-token' || st === 'done';
+    $('#modelGo').textContent = st === 'failed' ? 'Try again' : 'Download it now';
+    $('#modelStop').hidden = st !== 'running';
+  }
+  async function modelPost(url, body) {
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+      model = j; renderModel();
+    } catch (e) { banner(esc(e.message)); }
+  }
+  $('#modelGo').onclick = () => modelPost('/api/model/install');
+  $('#modelStop').onclick = () => modelPost('/api/model/cancel');
+  $('#hfSave').onclick = () => { const v = $('#hfToken').value.trim(); if (v) { $('#hfToken').value = ''; modelPost('/api/model/install', { hfToken: v }); } };
+  fetch('/api/model').then(r => r.json()).then(j => { model = j; renderModel(); }).catch(() => {});
+
+  fetch('/api/speech').then(r => r.json()).then(j => {
+    renderHardware(j.hardware);
+    eng = j; devices = j.devices || devices; renderEngine(); renderInputs(); addLog(j.log && j.log.length ? j.log : ['(nothing yet)']);
+    const u = j.usage;
+    if (u && Object.keys(u.hours).length) $('#sttUsage').textContent = `This month: ${Object.entries(u.hours).map(([k, h]) => `${k} ${h.toFixed(1)} h`).join(', ')} — about $${u.cost.toFixed(2)}.`;
+  }).catch(() => {});
+  fetch('/api/settings').then(r => r.json()).then(j => { s = j; render(); loadEnglishList(); fitPreview(); loadDisplays(); $('#preview').contentWindow.postMessage({ vfSettings: s }, location.origin); })
+    .catch(() => banner('Arabic Church Assistant\'s server is not reachable.'));
+  const es = new EventSource('/api/events');
+  es.addEventListener('settings', e => {
+    const j = JSON.parse(e.data);
+    if (!Object.keys(pending).length) { s = Object.assign(s, j); render(); $('#preview').contentWindow.postMessage({ vfSettings: s }, location.origin); }
+  });
+  es.addEventListener('speech', e => { eng = JSON.parse(e.data); renderEngine(); });
+  es.addEventListener('model', e => { model = JSON.parse(e.data); renderModel(); });
+  es.addEventListener('speech-log', e => addLog(JSON.parse(e.data)));
+  es.addEventListener('devices', e => { devices = JSON.parse(e.data) || devices; renderInputs(); });
+  es.addEventListener('level', e => { level = JSON.parse(e.data); });
+  es.addEventListener('videos', e => renderPlaylists(JSON.parse(e.data)));
+  requestAnimationFrame(meterLoop);
+  fetch('/api/speech/devices', { method: 'POST' }).catch(() => {});
+  if (location.hash === '#videos') setTimeout(() => document.getElementById('videos').scrollIntoView(), 300);
+  if (location.hash === '#engine') setTimeout(() => { const d = document.querySelector('#engine details'); if (d) d.open = true; }, 300);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "_note": "Bible keys that come with Arabic Church Assistant, so the ESV and the API.Bible translations (NKJV, NIV and more) work straight away. A church can use its own keys instead in Settings > English on screen.",
+  "esvKey": "f63eee05f05dd9d9008b15db6983f08be0a4435e",
+  "apiBibleKey": "Ys92ImTAZKBgecdlMhCjz"
+}

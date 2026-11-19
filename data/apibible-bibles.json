@@ -1,0 +1,246 @@
+{
+ "key": "e06e79739590",
+ "fetchedAt": 1795025599926,
+ "bibles": [
+  {
+   "id": "bba9f40183526463-01",
+   "abbr": "BSB",
+   "name": "English: Berean Standard Bible",
+   "desc": "English: Berean Standard Bible"
+  },
+  {
+   "id": "317e03834065a236-01",
+   "abbr": "BSB",
+   "name": "Berean Standard Bible",
+   "desc": ""
+  },
+  {
+   "id": "6bab4d6c61b31b80-01",
+   "abbr": "LXXup",
+   "name": "Brenton English Septuagint (Updated Spelling and Formatting)",
+   "desc": "common"
+  },
+  {
+   "id": "65bfdebd704a8324-01",
+   "abbr": "Brenton",
+   "name": "Brenton English translation of the Septuagint",
+   "desc": "Septuagint"
+  },
+  {
+   "id": "55212e3cf5d04d49-01",
+   "abbr": "KJVCPB",
+   "name": "Cambridge Paragraph Bible of the KJV",
+   "desc": "Common"
+  },
+  {
+   "id": "179568874c45066f-01",
+   "abbr": "DRA",
+   "name": "Douay-Rheims American 1899",
+   "desc": "Catholic"
+  },
+  {
+   "id": "65eec8e0b60e656b-01",
+   "abbr": "FBV",
+   "name": "Free Bible Version",
+   "desc": "Protestant FBV full 3.0 beta"
+  },
+  {
+   "id": "c315fa9f71d4af3a-01",
+   "abbr": "GNV",
+   "name": "Geneva Bible",
+   "desc": "common"
+  },
+  {
+   "id": "bf8f1c7f3f9045a5-01",
+   "abbr": "OJPS",
+   "name": "JPS TaNaKH 1917",
+   "desc": "Jewish"
+  },
+  {
+   "id": "de4e12af7f28f599-01",
+   "abbr": "KJV",
+   "name": "King James Version",
+   "desc": "Ecumenical"
+  },
+  {
+   "id": "de4e12af7f28f599-02",
+   "abbr": "KJV",
+   "name": "King James Version",
+   "desc": "Protestant"
+  },
+  {
+   "id": "01b29f4b342acc35-01",
+   "abbr": "LSV",
+   "name": "Literal Standard Version",
+   "desc": "Protestant"
+  },
+  {
+   "id": "78a9f6124f344018-01",
+   "abbr": "NIV",
+   "name": "New International Version",
+   "desc": "Holy Bible"
+  },
+  {
+   "id": "63097d2a0a2f7db3-01",
+   "abbr": "NKJV",
+   "name": "New King James Version",
+   "desc": "English: New King James Version Old and New Testament"
+  },
+  {
+   "id": "d6e14a625393b4da-01",
+   "abbr": "NLT",
+   "name": "New Living Translation",
+   "desc": "English: New Living Translation (Bible)"
+  },
+  {
+   "id": "b907c8622b59a1f7-01",
+   "abbr": "NLTCE",
+   "name": "New Living Translation Catholic Edition",
+   "desc": "English: New Living Translation Catholic Edition"
+  },
+  {
+   "id": "43e315b442a7c862-01",
+   "abbr": "NLTUK",
+   "name": "New Living Translation, Anglicised",
+   "desc": ""
+  },
+  {
+   "id": "40072c4a5aba4022-01",
+   "abbr": "RV",
+   "name": "Revised Version 1885",
+   "desc": "Interconfessional"
+  },
+  {
+   "id": "ec290b5045ff54a5-01",
+   "abbr": "OKE",
+   "name": "Targum Onkelos Etheridge",
+   "desc": "common"
+  },
+  {
+   "id": "2f0fd81d7b85b923-01",
+   "abbr": "F35",
+   "name": "The English New Testament According to Family 35",
+   "desc": "Common"
+  },
+  {
+   "id": "06125adad2d5898a-01",
+   "abbr": "ASV",
+   "name": "The Holy Bible, American Standard Version",
+   "desc": "Bible"
+  },
+  {
+   "id": "c89622d31b60c444-02",
+   "abbr": "TOJB2011",
+   "name": "The Orthodox Jewish Bible",
+   "desc": "OT follows Tanakh order, NT follows usual Protestant order"
+  },
+  {
+   "id": "32339cf2f720ff8e-01",
+   "abbr": "TCENT",
+   "name": "The Text-Critical English New Testament",
+   "desc": "common"
+  },
+  {
+   "id": "66c22495370cdfc0-01",
+   "abbr": "T4T",
+   "name": "Translation for Translators",
+   "desc": "common"
+  },
+  {
+   "id": "9879dbb7cfe39e4d-04",
+   "abbr": "WEB",
+   "name": "World English Bible",
+   "desc": "Protestant"
+  },
+  {
+   "id": "9879dbb7cfe39e4d-03",
+   "abbr": "WEB",
+   "name": "World English Bible",
+   "desc": "Orthodox"
+  },
+  {
+   "id": "9879dbb7cfe39e4d-02",
+   "abbr": "WEB",
+   "name": "World English Bible",
+   "desc": "Catholic"
+  },
+  {
+   "id": "9879dbb7cfe39e4d-01",
+   "abbr": "WEB",
+   "name": "World English Bible",
+   "desc": "Ecumenical"
+  },
+  {
+   "id": "7142879509583d59-01",
+   "abbr": "WEBBE",
+   "name": "World English Bible British Edition",
+   "desc": "Ecumenical"
+  },
+  {
+   "id": "7142879509583d59-02",
+   "abbr": "WEBBE",
+   "name": "World English Bible British Edition",
+   "desc": "Catholic"
+  },
+  {
+   "id": "7142879509583d59-03",
+   "abbr": "WEBBE",
+   "name": "World English Bible British Edition",
+   "desc": "Orthodox"
+  },
+  {
+   "id": "7142879509583d59-04",
+   "abbr": "WEBBE",
+   "name": "World English Bible British Edition",
+   "desc": "Protestant"
+  },
+  {
+   "id": "72f4e6dc683324df-01",
+   "abbr": "WEBU",
+   "name": "World English Bible Updated",
+   "desc": "Ecumenical"
+  },
+  {
+   "id": "72f4e6dc683324df-02",
+   "abbr": "WEBU",
+   "name": "World English Bible Updated",
+   "desc": "Protestant"
+  },
+  {
+   "id": "72f4e6dc683324df-03",
+   "abbr": "WEBU",
+   "name": "World English Bible Updated",
+   "desc": "Catholic"
+  },
+  {
+   "id": "32664dc3288a28df-03",
+   "abbr": "WEBUS",
+   "name": "World English Bible, American English Edition, without Strong's Numbers",
+   "desc": "Orthodox"
+  },
+  {
+   "id": "32664dc3288a28df-01",
+   "abbr": "WEBUS",
+   "name": "World English Bible, American English Edition, without Strong's Numbers",
+   "desc": "Ecumenical"
+  },
+  {
+   "id": "32664dc3288a28df-02",
+   "abbr": "WEBUS",
+   "name": "World English Bible, American English Edition, without Strong's Numbers",
+   "desc": "Protestant"
+  },
+  {
+   "id": "f72b840c855f362c-04",
+   "abbr": "WMB",
+   "name": "World Messianic Bible",
+   "desc": "Messianic"
+  },
+  {
+   "id": "04da588535d2f823-04",
+   "abbr": "WMBBE",
+   "name": "World Messianic Bible British Edition",
+   "desc": "Messianic"
+  }
+ ]
+}

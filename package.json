@@ -1,0 +1,22 @@
+{
+  "name": "arabic-church-assistant",
+  "productName": "Arabic Church Assistant",
+  "version": "3.4.0",
+  "description": "Listens to an Arabic sermon and brings up Bible verses and hymn videos as they are mentioned. Windows desktop app.",
+  "author": "Sameh Welson Faragallah",
+  "repository": "github:SamehFaragallah/arabic-church-assistant",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "server": "node server.js --open",
+    "test": "node test/engine.test.js && node test/youtube.test.js && node test/detect.test.js && node test/director.test.js",
+    "test:engine": "if exist engine\\python\\python.exe (engine\\python\\python.exe test\\engine_faults.py) else (engine\\.venv\\Scripts\\python.exe test\\engine_faults.py)"
+  },
+  "devDependencies": {
+    "electron": "45.3.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

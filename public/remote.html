@@ -1,0 +1,826 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0f13">
+<title>Arabic Church Assistant — Remote</title>
+<style>
+  :root {
+    --bg: #0d0f13; --panel: #161920; --panel2: #1d212a; --line: #262b35; --line2: #333a47;
+    --text: #ece9e2; --muted: #8e94a1; --gold: #d9b26a; --gold2: #f0cf8d; --ink: #1a1408;
+    --red: #e5604f; --green: #4fbf8a; --blue: #6aa7ff; --violet: #b48cff;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html { background: var(--bg); }
+  body { margin: 0 auto; max-width: 560px; padding: 14px 16px calc(32px + env(safe-area-inset-bottom)); background: var(--bg); color: var(--text);
+    font: 16px/1.4 "Segoe UI", system-ui, -apple-system, sans-serif; }
+  button, input { font-family: inherit; }
+
+  /* header */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 2px 2px 16px; }
+  .brand { font-weight: 700; font-size: 17px; color: var(--gold); letter-spacing: .2px; }
+  .brand small { display: block; color: var(--muted); font-weight: 500; font-size: 12px; margin-top: 2px; }
+  .pill { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line2);
+    font-size: 12.5px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+  .pill i { width: 8px; height: 8px; border-radius: 50%; background: #5b6170; }
+  .pill.on { color: var(--green); border-color: rgba(79, 191, 138, .45); }
+  .pill.on i { background: var(--green); box-shadow: 0 0 0 3px rgba(79, 191, 138, .2); }
+  .pill.bad { color: var(--red); border-color: rgba(229, 96, 79, .5); }
+  .pill.bad i { background: var(--red); }
+
+  /* PIN */
+  .pinbox { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+  .pinbox input { font: 700 24px ui-monospace, Consolas, monospace; letter-spacing: 8px; text-align: center; }
+  .msg { color: var(--muted); font-size: 13.5px; text-align: center; margin: 0 4px 14px; }
+  .msg:empty { display: none; }
+  .msg.bad { color: var(--red); }
+  body.locked .tabs, body.locked .pane, body.locked .player { display: none !important; }
+
+  /* tabs */
+  .tabs { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 5px; margin: 0 0 16px;
+    background: rgba(22, 25, 32, .94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border: 1px solid var(--line); border-radius: 15px; }
+  .tabs button { border: 0; background: transparent; color: var(--muted); font-size: 15px; font-weight: 600; padding: 11px 8px; border-radius: 11px; }
+  .tabs button.on { background: var(--gold); color: var(--ink); }
+
+  .pane { display: flex; flex-direction: column; gap: 14px; }
+  h2 { margin: 12px 4px -2px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* buttons */
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 56px; padding: 12px 14px; margin: 0;
+    font-size: 16px; font-weight: 600; line-height: 1.2; color: var(--text); background: var(--panel2); border: 1px solid var(--line2); border-radius: 15px;
+    cursor: pointer; touch-action: manipulation; transition: transform .08s, background-color .15s, border-color .15s; }
+  .btn:active { transform: scale(.97); border-color: var(--gold); }
+  .btn.gold { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+  .btn.danger { background: rgba(229, 96, 79, .12); border-color: rgba(229, 96, 79, .55); color: #ffb1a6; }
+  .btn em { font-style: normal; font-weight: 500; color: var(--muted); }
+  .btn.gold em { color: rgba(26, 20, 8, .65); }
+
+  /* what is on the screen */
+  .now { display: flex; flex-direction: column; gap: 6px; border-left: 4px solid var(--gold); }
+  .now .kind { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .now b { font-size: 21px; line-height: 1.3; unicode-bidi: plaintext; }
+  .now[data-type="message"] { border-left-color: var(--violet); }
+  .now[data-type="clear"] { border-left-color: #4a5060; }
+  .now[data-type="clear"] b { color: var(--muted); font-weight: 600; }
+
+  /* the video player (shown on both tabs while a video is on) */
+  .player { display: flex; flex-direction: column; gap: 14px; margin-bottom: 16px; border-color: rgba(217, 178, 106, .45);
+    background: linear-gradient(180deg, #1c2029, var(--panel)); }
+  .ph { display: flex; gap: 12px; align-items: center; }
+  .thumb { width: 104px; aspect-ratio: 16 / 9; flex: none; border-radius: 10px; background: #000 center / cover no-repeat; }
+  .pt { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .pt small { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gold); }
+  .pt b { font-size: 15.5px; line-height: 1.3; unicode-bidi: plaintext; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .prog { display: flex; flex-direction: column; gap: 4px; }
+  .bar { position: relative; height: 32px; cursor: pointer; touch-action: none; }
+  .bar::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 6px; margin-top: -3px; border-radius: 3px; background: #2e3440; }
+  .fill { position: absolute; left: 0; top: 50%; width: 0; height: 6px; margin-top: -3px; border-radius: 3px; background: var(--gold); }
+  .knob { position: absolute; left: 0; top: 50%; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--gold2);
+    box-shadow: 0 0 0 4px rgba(217, 178, 106, .25); transition: transform .1s; }
+  .bar.drag .knob { transform: scale(1.3); }
+  .prog.nodur .bar { opacity: .35; pointer-events: none; }
+  .times { display: flex; justify-content: space-between; font: 600 12.5px ui-monospace, Consolas, monospace; color: var(--muted); }
+  .transport { display: grid; grid-template-columns: 1fr 1.35fr 1fr; gap: 12px; }
+  .transport .btn { min-height: 64px; flex-direction: column; gap: 2px; font-size: 22px; }
+  .transport .btn span { font-size: 12.5px; }
+  .tools { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .tools .btn { min-height: 58px; flex-direction: column; gap: 3px; padding: 8px 2px; font-size: 18px; border-radius: 13px; }
+  .tools .btn span { font-size: 11px; color: var(--muted); }
+  .tools .btn.danger span { color: #ffb1a6; }
+
+  /* voice and typing: a round hold-to-speak button */
+  .voice { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 30px 16px 16px; }
+  .mic { position: relative; width: 128px; height: 128px; margin: 0 0 8px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; color: #fff;
+    background: radial-gradient(circle at 34% 28%, #5b97ff, #2f63e0 58%, #1f429f); cursor: pointer;
+    box-shadow: 0 12px 32px rgba(47, 99, 224, .38), inset 0 2px 0 rgba(255, 255, 255, .22), inset 0 -6px 14px rgba(0, 0, 0, .25);
+    user-select: none; -webkit-user-select: none; touch-action: none; transition: transform .12s, box-shadow .2s; }
+  .mic::before, .mic::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+  .mic::before { inset: -9px; border: 2px solid rgba(91, 151, 255, .35); }
+  .mic::after { inset: -20px; border: 2px solid rgba(91, 151, 255, .14); }
+  .mic svg { width: 50px; height: 50px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .3)); }
+  .mic:active { transform: scale(.95); }
+  .mic.rec { background: radial-gradient(circle at 34% 28%, #ff8a7c, #e5604f 58%, #a9372a); box-shadow: 0 12px 36px rgba(229, 96, 79, .5), inset 0 2px 0 rgba(255, 255, 255, .22); transform: scale(1.04); }
+  .mic.rec::before, .mic.rec::after { border-color: rgba(229, 96, 79, .6); animation: ring 1.3s ease-out infinite; }
+  .mic.rec::after { animation-delay: .65s; }
+  .mic.busy { opacity: .6; }
+  @keyframes ring { from { transform: scale(.92); opacity: 1; } to { transform: scale(1.3); opacity: 0; } }
+  .voice .vt { font-size: 18px; font-weight: 700; }
+  .voice .vh { min-height: 20px; margin: -4px 0 6px; font-size: 13.5px; text-align: center; color: var(--muted); unicode-bidi: plaintext; }
+  .voice .field { align-self: stretch; }
+
+  /* Previous / Next: pinned to the bottom, where the thumb rests */
+  .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; padding: 22px 16px calc(14px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(13, 15, 19, 0), rgba(13, 15, 19, .94) 30%, var(--bg)); }
+  .dock .inner { max-width: 528px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.3fr; gap: 12px; }
+  .dock .btn { min-height: 76px; font-size: 19px; border-radius: 18px; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+  .dock .btn b { font-size: 22px; }
+  .dock .btn:not(.gold) { background: #232833; }
+  body:not([data-tab="screen"]) .dock, body.locked .dock, body.typing .dock { display: none; }
+
+  /* Bible picker: book → chapter → verse */
+  .step { display: flex; flex-direction: column; gap: 12px; }
+  .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .crumbs .sep { color: var(--muted); font-size: 18px; }
+  .crumb { border: 1px solid var(--line2); background: var(--panel2); color: var(--text); font-size: 14.5px; font-weight: 600; padding: 9px 15px; border-radius: 999px; unicode-bidi: plaintext; }
+  .crumb:disabled { background: transparent; border-color: transparent; color: var(--gold); padding: 9px 4px; }
+  .bgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .bk { min-height: 62px; flex-direction: column; gap: 3px; padding: 8px 4px; border-radius: 13px; }
+  .bk b { font-size: 15.5px; line-height: 1.2; text-align: center; }
+  .bk small { font-size: 11px; font-weight: 500; color: var(--muted); }
+  .ngrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; }
+  .ngrid .btn { min-height: 54px; padding: 6px; font-size: 17px; border-radius: 13px; }
+  .vlist { display: flex; flex-direction: column; gap: 8px; }
+  .vrow { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; align-items: start; width: 100%; margin: 0; padding: 12px 12px 12px 14px; text-align: right;
+    color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; cursor: pointer; touch-action: manipulation; }
+  .vrow:active { border-color: var(--gold); }
+  .vrow .num { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--panel2); color: var(--gold); font-weight: 700; font-size: 14px; }
+  .vrow .tx { font-size: 16.5px; line-height: 1.6; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+  .vrow.on { border-color: var(--gold); background: rgba(217, 178, 106, .12); }
+  .vrow.on .num { background: var(--gold); color: var(--ink); }
+  body[data-tab="screen"]:not(.locked):not(.typing) { padding-bottom: calc(126px + env(safe-area-inset-bottom)); }
+  body[data-tab="screen"]:not(.locked):not(.typing) .toast { bottom: calc(118px + env(safe-area-inset-bottom)); }
+  .field { display: flex; gap: 10px; }
+  .field .btn { flex: none; padding: 12px 20px; }
+  input { flex: 1; width: 100%; min-width: 0; min-height: 54px; font-size: 16px; background: var(--panel); color: var(--text); border: 1px solid var(--line2);
+    border-radius: 15px; padding: 12px 14px; outline: none; unicode-bidi: plaintext; }
+  input:focus { border-color: var(--gold); }
+  input::placeholder { color: #6b7180; }
+  .listen { justify-content: flex-start; gap: 12px; padding-left: 18px; margin-top: 6px; }
+  .listen i { width: 12px; height: 12px; border-radius: 50%; background: #5b6170; flex: none; }
+  .listen.on { background: rgba(79, 191, 138, .1); border-color: rgba(79, 191, 138, .5); color: var(--green); }
+  .listen.on i { background: var(--green); box-shadow: 0 0 0 4px rgba(79, 191, 138, .2); }
+
+  /* the service plan (Screen tab, under Listening) */
+  .prow { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 10px 10px 12px; }
+  .prow .pn { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; background: var(--panel2); color: var(--muted); font-weight: 700; font-size: 13px; }
+  .prow .ptx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .prow b { font-size: 15px; unicode-bidi: plaintext; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow small { font-size: 12.5px; color: var(--muted); unicode-bidi: plaintext; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .prow .btn { min-height: 46px; padding: 8px 14px; font-size: 14px; }
+  .prow.on { border-color: var(--gold); background: rgba(217, 178, 106, .1); }
+  .prow.on .pn { background: var(--gold); color: var(--ink); }
+  .btn.inplan { background: #fff; border-color: #fff; color: var(--ink); }
+  /* YouTube search box with a clear (✕) button at its right end */
+  .search { position: relative; flex: 1; min-width: 0; display: flex; }
+  .search input { padding-right: 50px; }
+  .search .x { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; margin: 0; padding: 0; border: 0; border-radius: 50%;
+    display: grid; place-items: center; background: var(--panel2); color: var(--text); font-size: 17px; font-weight: 700; cursor: pointer; }
+  .search .x:active { background: var(--line2); }
+
+  /* video lists */
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .item { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px 12px; align-items: center; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 16px; padding: 10px; }
+  .item img { width: 96px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 10px; background: #000; }
+  .item .t { font-size: 14.5px; font-weight: 600; line-height: 1.3; unicode-bidi: plaintext; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .item .d { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .item .acts { grid-column: 1 / -1; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 8px; }
+  .item .acts .btn { min-height: 46px; padding: 8px 6px; font-size: 14px; border-radius: 12px; }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 16px 8px; }
+
+  /* what the console found while listening: the newest first */
+  .frow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 10px; align-items: center; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 10px 10px 10px 14px; }
+  .frow .ftx { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .frow b { font-size: 16px; unicode-bidi: plaintext; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frow small { font-size: 12.5px; color: var(--muted); unicode-bidi: plaintext; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .frow .songs + small, .frow small:has(+ .songs) { white-space: normal; }
+  .frow .facts { display: flex; gap: 6px; }
+  .frow .btn { min-height: 46px; padding: 8px 12px; font-size: 14px; }
+  .frow.on { border-color: var(--gold); background: rgba(217, 178, 106, .1); }
+  .frow .songs { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+  .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 0 0; border-top: 1px solid var(--line); }
+  .srow span { font-size: 14px; unicode-bidi: plaintext; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .srow .btn { min-height: 42px; padding: 6px 12px; font-size: 13.5px; }
+  .more { align-self: center; border: 0; background: none; color: var(--gold); font-size: 14px; font-weight: 600; padding: 6px 12px; }
+  /* what a spoken or typed command found */
+  .out { align-self: stretch; display: flex; flex-direction: column; gap: 8px; }
+  .out:empty { display: none; }
+  /* a message on the screen */
+  .msgbox { display: flex; flex-direction: column; gap: 10px; }
+  textarea { width: 100%; min-height: 84px; font: inherit; font-size: 16px; background: var(--panel); color: var(--text); border: 1px solid var(--line2);
+    border-radius: 15px; padding: 12px 14px; outline: none; resize: vertical; unicode-bidi: plaintext; }
+  textarea:focus { border-color: var(--gold); }
+
+  .toast { position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 12px); z-index: 10; max-width: 90%;
+    background: rgba(0, 0, 0, .88); color: #fff; padding: 11px 18px; border-radius: 12px; font-size: 14px; text-align: center; unicode-bidi: plaintext;
+    opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body class="locked" data-tab="screen">
+  <header class="top">
+    <div class="brand">✦ Arabic Church Assistant <small>Phone remote · by Sameh Welson Faragallah</small></div>
+    <div class="pill" id="pill"><i></i><span id="pillText">Not connected</span></div>
+  </header>
+
+  <div class="card pinbox" id="pinRow">
+    <div class="field">
+      <input id="pin" inputmode="numeric" maxlength="8" placeholder="PIN" autocomplete="off">
+      <button id="pinGo" class="btn gold">Connect</button>
+    </div>
+  </div>
+  <div class="msg" id="msg">The PIN is shown in Arabic Church Assistant → Settings → Phone remote.</div>
+
+  <nav class="tabs"><button data-tab="screen" class="on">📺 Screen</button><button data-tab="bible">📖 Bible</button><button data-tab="videos">🎵 Videos</button></nav>
+
+  <!-- the video on the screen: shown on both tabs -->
+  <section class="card player" id="player" hidden>
+    <div class="ph">
+      <div class="thumb" id="pThumb"></div>
+      <div class="pt"><small id="pState">Playing</small><b id="pTitle" dir="auto"></b></div>
+    </div>
+    <div class="prog" id="prog">
+      <div class="bar" id="bar"><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>
+      <div class="times"><span id="tNow">0:00</span><span id="tDur">–:––</span></div>
+    </div>
+    <div class="transport">
+      <button class="btn" data-v="skip:-10">⏪<span>10 s</span></button>
+      <button class="btn gold" data-v="toggle" id="pToggle">⏸<span>Pause</span></button>
+      <button class="btn" data-v="skip:10">⏩<span>10 s</span></button>
+    </div>
+    <div class="tools">
+      <button class="btn" data-v="vol:-10">🔉<span>Quieter</span></button>
+      <button class="btn" data-v="mute" id="pMute">🔇<span>Mute</span></button>
+      <button class="btn" data-v="vol:10">🔊<span>Louder</span></button>
+      <button class="btn" data-v="restart">⟲<span>Restart</span></button>
+      <button class="btn danger" data-v="stop">■<span>Stop</span></button>
+    </div>
+  </section>
+
+  <!-- the screen -->
+  <main class="pane" id="screen">
+    <section class="card now" id="now" data-type="clear"><span class="kind" id="nowKind">On screen</span><b id="nowLabel">—</b></section>
+    <div class="grid2">
+      <button class="btn" id="back">⟲ Back</button>
+      <button class="btn danger" id="clear">✕ Clear</button>
+    </div>
+    <div class="grid2">
+      <button class="btn" id="latest">✦ Show newest</button>
+      <button class="btn" id="planNext">☰ Next in plan <em id="planN"></em></button>
+    </div>
+    <h2 id="foundHead" hidden>Found while listening</h2>
+    <div class="list" id="foundList"></div>
+    <button class="more" id="foundMore" hidden>Show more</button>
+    <h2>Say it or type it</h2>
+    <section class="card voice">
+      <button id="talk" class="mic" aria-label="Hold to speak">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0"/><path d="M12 17.5V21"/><path d="M8.5 21h7"/>
+        </svg>
+      </button>
+      <div class="vt" id="talkText">Hold to speak</div>
+      <div class="vh" id="heard">Say a verse («يوحنا ٣ ١٦») or a hymn title, then let go</div>
+      <div class="field">
+        <input id="cmd" dir="auto" placeholder="Or type: يوحنا ٣ ١٦ · a hymn">
+        <button id="cmdGo" class="btn gold">Show</button>
+      </div>
+      <div class="out list" id="cmdOut"></div>
+    </section>
+    <button id="listen" class="btn listen"><i></i><span id="listenText">Listening: …</span></button>
+    <button id="hold" class="btn"><span id="holdText">Hold: off</span></button>
+    <h2>Message on the screen</h2>
+    <section class="card msgbox">
+      <input id="mTitle" dir="auto" placeholder="Title (optional): Announcements">
+      <textarea id="mText" dir="auto" placeholder="The words to show: an announcement, prayer points…"></textarea>
+      <button id="mShow" class="btn">Show the message</button>
+    </section>
+    <h2 id="planHead" hidden>Service plan</h2>
+    <div class="list" id="planList"></div>
+  </main>
+
+  <!-- Bible picker: tap a book, a chapter, then a verse to put it on the screen -->
+  <main class="pane" id="bible" hidden>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="step" id="bBooks" dir="rtl">   <!-- only the books read right to left (Genesis at the top right); chapter numbers start at the left -->
+      <input id="bFind" dir="rtl" placeholder="ابحث عن سفر: يوحنا · John">
+      <h2>العهد القديم · Old Testament</h2>
+      <div class="bgrid" id="otGrid"></div>
+      <h2>العهد الجديد · New Testament</h2>
+      <div class="bgrid" id="ntGrid"></div>
+    </div>
+    <div class="step" id="bChapters" hidden>
+      <h2 id="chTitle"></h2>
+      <div class="ngrid" id="chGrid"></div>
+    </div>
+    <div class="step" id="bVerses" hidden>
+      <h2 id="vTitle"></h2>
+      <div class="vlist" id="vList"></div>
+      <div class="grid2" id="chNav"></div>
+    </div>
+  </main>
+
+  <!-- videos -->
+  <main class="pane" id="videos" hidden>
+    <h2>Search YouTube</h2>
+    <div class="field">
+      <div class="search">
+        <input id="yt" dir="auto" placeholder="Any song or video…">
+        <button id="ytClear" class="x" aria-label="Clear the search" hidden>✕</button>
+      </div>
+      <button id="ytGo" class="btn gold">Search</button>
+    </div>
+    <div class="list" id="ytList"></div>
+    <h2>Your videos and the song database</h2>
+    <input id="filter" dir="auto" placeholder="Find a hymn: your playlists and the song database…">
+    <div class="list" id="libList"></div>
+    <h2 id="dbHead" hidden>From the song database</h2>
+    <div class="list" id="dbList"></div>
+  </main>
+  <!-- Previous / Next, pinned to the bottom of the phone (Screen tab) -->
+  <nav class="dock" id="dock">
+    <div class="inner">
+      <button class="btn" id="prev"><b>◀</b> Previous</button>
+      <button class="btn gold" id="next">Next <b>▶</b></button>
+    </div>
+  </nav>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = s => document.querySelector(s);
+  let pin = ''; try { pin = localStorage.getItem('vf.remotePin') || ''; } catch { /* private mode */ }
+  $('#pin').value = pin;
+  let state = {}, library = [], connected = false, pinBad = false;
+  let planned = new Set(), plannedSig = '', planSig = '', ytResults = null;   // videos in the plan; what the plan list and YouTube list show
+  const toast = t => { const el = $('#toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 3000); };
+  const thumb = (id, q) => `https://i.ytimg.com/vi/${encodeURIComponent(id)}/${q || 'mqdefault'}.jpg`;
+  const fmtT = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+  function setMsg(text, bad) { $('#msg').textContent = text || ''; $('#msg').className = bad ? 'msg bad' : 'msg'; }
+  function setPill(text, cls) { $('#pillText').textContent = text; $('#pill').className = 'pill' + (cls ? ' ' + cls : ''); }
+
+  async function act(action, more) {
+    if (!pin) { setMsg('Enter the PIN first.', true); return null; }
+    try {
+      const r = await fetch('/api/remote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ pin, action }, more || {})) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+      connected = true; pinBad = false;
+      document.body.classList.remove('locked');
+      $('#pinRow').hidden = true;
+      setMsg('');
+      render(j);
+      return j;
+    } catch (e) {
+      const badPin = /PIN/i.test(e.message);
+      setMsg(badPin || !connected ? e.message : 'Lost touch with Arabic Church Assistant: ' + e.message, true);
+      setPill(badPin ? 'Wrong PIN' : 'Not connected', 'bad');
+      if (badPin) { connected = false; pinBad = true; document.body.classList.add('locked'); $('#pinRow').hidden = false; }
+      return null;
+    }
+  }
+
+  // ---- progress bar: the display reports the position every second; the phone moves the bar smoothly in between
+  let pos = null, drag = null, movedAt = 0;   // movedAt: when this phone last seeked/skipped (older reports are ignored)
+  const current = () => { if (!pos) return 0; const t = pos.time + (pos.playing ? (performance.now() - pos.at) / 1000 : 0); return pos.duration ? Math.min(pos.duration, t) : t; };
+  function paint() {
+    const known = pos && pos.duration > 0;
+    $('#prog').classList.toggle('nodur', !known);
+    const t = drag != null && known ? drag * pos.duration : current();
+    const f = known ? Math.min(1, Math.max(0, t / pos.duration)) : 0;
+    $('#fill').style.width = (f * 100).toFixed(2) + '%';
+    $('#knob').style.left = (f * 100).toFixed(2) + '%';
+    $('#tNow').textContent = pos ? fmtT(t) : '0:00';
+    $('#tDur').textContent = known ? fmtT(pos.duration) : '–:––';
+  }
+  const bar = $('#bar');
+  const fracAt = e => { const r = bar.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); };
+  bar.addEventListener('pointerdown', e => { if (!pos || !pos.duration) return; drag = fracAt(e); bar.setPointerCapture(e.pointerId); bar.classList.add('drag'); paint(); });
+  bar.addEventListener('pointermove', e => { if (drag != null) { drag = fracAt(e); paint(); } });
+  bar.addEventListener('pointerup', () => {
+    if (drag == null) return;
+    const t = Math.round(drag * pos.duration);
+    drag = null; bar.classList.remove('drag');
+    pos.time = t; pos.at = movedAt = performance.now(); paint();
+    act('video', { video: { action: 'seek', t } }).then(() => setTimeout(() => act('state'), 700));
+  });
+  bar.addEventListener('pointercancel', () => { drag = null; bar.classList.remove('drag'); paint(); });
+  setInterval(() => { if (state.video && drag == null) paint(); }, 250);
+
+  function render(j) {
+    state = j;
+    const sc = j.screen || {}, v = j.video;
+    // header and listening
+    setPill(j.listening ? 'Listening' : 'Not listening', j.listening ? 'on' : '');
+    $('#pill').title = j.speech ? 'Speech: ' + j.speech : '';
+    $('#listenText').textContent = j.listening ? 'Listening — tap to stop' : 'Not listening — tap to start';
+    $('#listen').classList.toggle('on', !!j.listening);
+    $('#holdText').textContent = j.hold ? 'Hold is ON: nothing goes up by itself — tap to turn off' : 'Hold: off — tap to stop the screen changing by itself';
+    $('#hold').classList.toggle('danger', !!j.hold);
+    $('#back').disabled = !j.canBack;
+    $('#planN').textContent = j.planItems ? `(${j.planItems})` : '';
+    renderPlanList(j.plan || [], sc, v);
+    renderFound(j.found || [], j.foundSeq, sc, v);
+    // what is on the screen
+    $('#now').hidden = sc.type === 'video';
+    $('#now').dataset.type = sc.type || 'clear';
+    $('#nowKind').textContent = { show: 'On screen', message: 'Message on screen', clear: 'The screen is clear' }[sc.type] || 'On screen';
+    // (each label inside its own direction marks: the 1 of "1 John 4:21" otherwise joins the Arabic number before it)
+    $('#nowLabel').textContent = sc.type === 'show' ? `\u2067${sc.label || ''}\u2069${sc.labelEn ? '  ·  \u2066' + sc.labelEn + '\u2069' : ''}` : sc.type === 'clear' ? 'Nothing is showing' : (sc.title || '—');
+    // the video
+    $('#player').hidden = !v;
+    if (!v) { pos = null; return; }
+    const playing = v.playing != null ? v.playing : !v.paused;
+    if ($('#pThumb').dataset.id !== v.id) { $('#pThumb').dataset.id = v.id; $('#pThumb').style.backgroundImage = `url("${thumb(v.id)}")`; }
+    $('#pTitle').textContent = v.title || 'Video';
+    $('#pState').textContent = (playing ? 'Playing' : 'Paused') + ' · ' + (v.muted ? 'muted' : `volume ${v.volume}%`);
+    $('#pToggle').innerHTML = playing ? '⏸<span>Pause</span>' : '▶<span>Play</span>';
+    $('#pMute').innerHTML = v.muted ? '🔈<span>Unmute</span>' : '🔇<span>Mute</span>';
+    const reportedAt = performance.now() - (v.age || 0);
+    if (v.time != null && drag == null && reportedAt > movedAt + 150) pos = { id: v.id, time: v.time + (v.playing ? (v.age || 0) / 1000 : 0), duration: v.duration || 0, playing: !!v.playing, at: performance.now() };
+    else if (pos && pos.id !== v.id) pos = null;
+    paint();
+  }
+
+  // ---- the service plan, under Listening: tap an item to show or play it
+  function renderPlanList(items, sc, v) {
+    const box = $('#planList'), sig = JSON.stringify(items);
+    if (sig !== planSig) {
+      planSig = sig;
+      box.innerHTML = '';
+      items.forEach((it, i) => {
+        const row = document.createElement('div');
+        row.className = 'prow';
+        row.dataset.key = it.kind === 'video' ? 'v:' + it.id : 'r:' + it.labelEn;
+        row.innerHTML = '<span class="pn"></span><div class="ptx"><b dir="auto"></b><small dir="auto"></small></div><button class="btn"></button>';
+        row.querySelector('.pn').textContent = i + 1;
+        row.querySelector('b').textContent = it.kind === 'video' ? '🎵 ' + it.title : (it.label || it.labelEn);
+        row.querySelector('small').textContent = it.kind === 'video' ? 'Hymn / video' : [it.labelEn, it.text].filter(Boolean).join(' — ');
+        const go = row.querySelector('button');
+        go.textContent = it.kind === 'video' ? '▶ Play' : 'Show';
+        go.onclick = async () => { const j = await act('plan-go', { index: i }); if (j) { toast(j.message || 'Done'); setTimeout(() => act('state'), 800); } };
+        box.appendChild(row);
+      });
+      $('#planHead').textContent = `Service plan (${items.length})`;
+      $('#planHead').hidden = !items.length;
+      // videos already in the plan say "In Plan" in the video lists
+      const ids = new Set(items.filter(it => it.kind === 'video').map(it => it.id));
+      const idSig = [...ids].sort().join(',');
+      if (idSig !== plannedSig) { plannedSig = idSig; planned = ids; if (library.length) renderLibrary(); renderYt(); }
+    }
+    const nowKey = v ? 'v:' + v.id : sc && sc.type === 'show' ? 'r:' + sc.labelEn : '';   // what is on the screen now
+    box.querySelectorAll('.prow').forEach(r => r.classList.toggle('on', !!nowKey && r.dataset.key === nowKey));
+  }
+
+  // ---- what the console found while listening: tap to show a verse, or to play a hymn (it never plays by itself from here)
+  let foundSig = '', foundAll = false;
+  const SOURCE = { reference: 'Mentioned', context: 'Same chapter', quote: 'Quoted', next: 'Next verse', prev: 'Previous verse', read: 'Read on', phrase: 'Set prayer' };
+  const play = async (id, title) => { const j = await act('video', { video: { action: 'play', id, title } }); if (j) { toast('Playing: ' + title); setTimeout(() => act('state'), 800); } };
+  function songRow(s) {
+    const row = document.createElement('div');
+    row.className = 'srow';
+    row.innerHTML = '<span dir="auto"></span><button class="btn gold">▶ Play</button>';
+    row.querySelector('span').textContent = s.title;
+    row.querySelector('button').onclick = () => play(s.id, s.title);
+    return row;
+  }
+  function verseButton(ref, text) {
+    const b = document.createElement('button');
+    b.className = 'btn gold'; b.textContent = text || 'Show';
+    b.onclick = async () => { const j = await act('show-ref', ref); if (j) { toast(j.message || 'On screen'); setTimeout(() => act('state'), 800); } };
+    return b;
+  }
+  function renderFound(list, seq, sc, v) {
+    const box = $('#foundList'), shown = foundAll ? list : list.slice(0, 5), sig = seq + ':' + foundAll + ':' + list.length;
+    if (sig !== foundSig) {
+      foundSig = sig;
+      box.innerHTML = '';
+      for (const f of shown) {
+        const row = document.createElement('div');
+        row.className = 'frow';
+        row.innerHTML = '<div class="ftx"><b dir="auto"></b><small dir="auto"></small></div><div class="facts"></div>';
+        const acts = row.querySelector('.facts');
+        if (f.k === 'verse') {
+          row.dataset.key = f.labelEn;
+          row.querySelector('b').textContent = f.label || f.labelEn;
+          row.querySelector('small').textContent = [f.labelEn, (SOURCE[f.source] || f.source || 'Found') + (f.auto ? ', went up' : '') + (f.probable ? ', not sure' : '')].filter(Boolean).join(' · ');
+          if (f.ref && f.ref.verse != null) {
+            acts.appendChild(verseButton(f.ref));
+            const p = document.createElement('button'); p.className = 'btn'; p.textContent = '＋ Plan';
+            p.onclick = async () => { const j = await act('plan-verse', f.ref); if (j) toast(j.message || 'Added to the plan'); };
+            acts.appendChild(p);
+          }
+        } else if (f.k === 'song') {
+          row.dataset.key = 'v:' + f.id;
+          row.querySelector('b').textContent = '🎵 ' + f.title;
+          row.querySelector('small').textContent = f.played ? 'From your playlists · it started by itself' : 'From your playlists · heard';
+          const b = document.createElement('button'); b.className = 'btn gold'; b.textContent = '▶ Play'; b.onclick = () => play(f.id, f.title); acts.appendChild(b);
+        } else if (f.k === 'songs') {
+          row.querySelector('b').textContent = '🎵 «' + f.heard + '»';
+          row.querySelector('small').textContent = (f.how === 'phone' ? 'Asked for on the phone' : 'Hymn announced') + ' · not in your playlists · the song database has:';
+          const songs = document.createElement('div'); songs.className = 'songs';
+          for (const s of f.songs.slice(0, 3)) songs.appendChild(songRow(s));
+          row.appendChild(songs);
+        }
+        box.appendChild(row);
+      }
+      $('#foundHead').hidden = !list.length;
+      $('#foundMore').hidden = list.length <= 5;
+      $('#foundMore').textContent = foundAll ? 'Show fewer' : `Show more (${list.length - 5})`;
+    }
+    const nowKey = v ? 'v:' + v.id : sc && sc.type === 'show' ? sc.labelEn : '';
+    box.querySelectorAll('.frow').forEach(r => r.classList.toggle('on', !!nowKey && r.dataset.key === nowKey));
+  }
+  $('#foundMore').onclick = () => { foundAll = !foundAll; foundSig = ''; act('state'); };
+
+  // what a spoken or typed command found: songs to choose from (the song database), or a verse to show
+  function showCmdResult(j) {
+    const out = $('#cmdOut'); out.innerHTML = '';
+    if (!j) return;
+    for (const s of j.songs || []) { const r = songRow(s); r.style.borderTop = '0'; out.appendChild(r); }
+    if (j.verse) out.appendChild(verseButton(j.verse, 'Show ' + (j.verse.labelEn || 'the verse') + ' instead'));
+  }
+
+  // a message on the screen
+  $('#mShow').onclick = async () => {
+    const title = $('#mTitle').value.trim(), text = $('#mText').value.trim();
+    if (!title && !text) { toast('Type the message first'); return; }
+    const j = await act('message', { title, text });
+    if (j) toast('The message is on the screen');
+  };
+
+  // ---- the screen
+  $('#next').onclick = () => act('next');
+  $('#prev').onclick = () => act('prev');
+  $('#latest').onclick = () => act('show-latest');
+
+  $('#clear').onclick = () => act('clear');
+  $('#back').onclick = () => act('back');          // what was on the screen before: undoes a wrong change
+  $('#hold').onclick = () => act(state.hold ? 'hold-off' : 'hold-on');
+
+  // hide the Previous / Next bar while typing, so the keyboard doesn't push it over the text box
+  document.addEventListener('focusin', e => { if (e.target.matches && e.target.matches('input')) document.body.classList.add('typing'); });
+  document.addEventListener('focusout', () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!(a && a.matches && a.matches('input'))) document.body.classList.remove('typing');
+  }, 500));
+  $('#planNext').onclick = () => act('plan-next');
+  $('#listen').onclick = () => act(state.listening ? 'listen-off' : 'listen-on');
+  const runCmd = async () => {
+    const text = $('#cmd').value.trim(); if (!text) return;
+    $('#heard').textContent = 'Sending…';
+    const j = await act('command', { text });
+    $('#heard').textContent = j ? (j.message || '') : '';
+    showCmdResult(j);
+    if (j) $('#cmd').value = '';
+  };
+  $('#cmdGo').onclick = runCmd;
+  $('#cmd').onkeydown = e => { if (e.key === 'Enter') runCmd(); };
+
+  // ---- video buttons
+  document.querySelectorAll('.player [data-v]').forEach(b => b.onclick = () => {
+    const v = b.dataset.v, cur = state.video || {};
+    const playing = cur.playing != null ? cur.playing : !cur.paused;
+    let video;
+    if (v === 'toggle') video = { action: playing ? 'pause' : 'resume' };
+    else if (v.startsWith('skip:')) {
+      video = { action: 'skip', by: +v.slice(5) };
+      if (pos) { pos.time = Math.max(0, current() + video.by); pos.at = movedAt = performance.now(); paint(); }
+    } else if (v.startsWith('vol:')) video = { action: 'volume', volume: Math.max(0, Math.min(100, (cur.volume || 0) + +v.slice(4))) };
+    else if (v === 'mute') video = { action: 'mute', muted: !cur.muted };
+    else video = { action: v };
+    act('video', { video }).then(() => setTimeout(() => act('state'), 600));
+  });
+
+  // ---- videos: YouTube search and the church's playlists
+  function itemRow(v, opts) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = '<img alt="" loading="lazy"><div><div class="t" dir="auto"></div><div class="d"></div></div><div class="acts"></div>';
+    row.querySelector('img').src = thumb(v.id, 'default');
+    row.querySelector('.t').textContent = v.title;
+    row.querySelector('.d').textContent = [v.duration, v.channel || v.playlist].filter(Boolean).join(' · ');
+    const acts = row.querySelector('.acts');
+    const add = (label, fn, cls) => { const b = document.createElement('button'); b.className = 'btn' + (cls ? ' ' + cls : ''); b.textContent = label; b.onclick = fn; acts.appendChild(b); return b; };
+    add('▶ Play now', async () => { const j = await act('video', { video: { action: 'play', id: v.id, title: v.title } }); if (j) toast('Playing: ' + v.title); }, 'gold');
+    // "+ Plan" adds the video to the plan; "In Plan" (white) takes it out again
+    add(planned.has(v.id) ? 'In Plan' : '＋ Plan', async () => {
+      const j = planned.has(v.id) ? await act('unplan-video', { id: v.id }) : await act('plan-video', { id: v.id, title: v.title });
+      if (j) toast(planned.has(v.id) ? 'Added to the plan' : 'Removed from the plan');   // the lists redraw with the new button
+    }, planned.has(v.id) ? 'inplan' : '');
+    if (opts && opts.canSave && library.some(x => x.id === v.id)) add('✓ Mine', () => toast('Already in your videos'), 'inplan');
+    else if (opts && opts.canSave) {
+      const sb = add('＋ My videos', async () => {
+        sb.textContent = '…';
+        const j = await act('add-video', { id: v.id });
+        sb.textContent = j ? '✓ Saved' : '＋ My videos';
+        if (j) { toast('Added to your videos'); loadLibrary(); }
+      });
+    }
+    return row;
+  }
+  async function loadLibrary() {
+    const j = await act('videos');
+    if (j && j.videos) { library = j.videos; renderLibrary(); }
+  }
+  const norm = s => String(s || '').replace(/[ً-ْـ]/g, '').replace(/[إأآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').toLowerCase();
+  function renderLibrary() {
+    const f = norm($('#filter').value);
+    const box = $('#libList'); box.innerHTML = '';
+    for (const v of library.filter(v => !f || norm(v.title).includes(f)).slice(0, 80)) box.appendChild(itemRow(v));
+    if (!box.children.length) box.innerHTML = '<div class="empty">' + (f ? 'Not in your playlists.' : 'No videos yet.') + '</div>';
+  }
+  // the song database (the hymns of whole channels and playlists): looked up on the PC as the words are typed
+  let dbTimer = null, dbAsked = '';
+  async function findInDatabase() {
+    const q = $('#filter').value.trim();
+    if (q.length < 2) { $('#dbList').innerHTML = ''; $('#dbHead').hidden = true; dbAsked = ''; return; }
+    if (q === dbAsked) return;
+    dbAsked = q;
+    const j = await act('find-songs', { q });
+    if (!j || q !== $('#filter').value.trim()) return;
+    const more = (j.songs || []).filter(s => !s.mine && !library.some(x => x.id === s.id));
+    const box = $('#dbList'); box.innerHTML = '';
+    for (const s of more.slice(0, 40)) box.appendChild(itemRow(s, { canSave: true }));
+    $('#dbHead').hidden = !more.length;
+    $('#dbHead').textContent = `From the song database (${more.length})`;
+  }
+  $('#filter').oninput = () => { renderLibrary(); clearTimeout(dbTimer); dbTimer = setTimeout(findInDatabase, 350); };
+  function ytX() { $('#ytClear').hidden = !($('#yt').value || ytResults); }   // the ✕ shows while there is something to clear
+  function renderYt() {
+    ytX();
+    if (!ytResults) return;
+    const box = $('#ytList'); box.innerHTML = '';
+    for (const v of ytResults) box.appendChild(itemRow(v, { canSave: true }));
+    if (!box.children.length) box.innerHTML = '<div class="empty">Nothing found.</div>';
+  }
+  const ytSearch = async () => {
+    const q = $('#yt').value.trim(); if (!q) return;
+    $('#ytList').innerHTML = '<div class="empty">Searching YouTube…</div>';
+    const j = await act('youtube', { q });
+    ytResults = (j && j.videos) || [];
+    renderYt();
+  };
+  $('#ytGo').onclick = ytSearch;
+  $('#ytClear').onclick = () => { ytResults = null; $('#yt').value = ''; $('#ytList').innerHTML = ''; ytX(); };
+  $('#yt').addEventListener('input', ytX);
+  $('#yt').onkeydown = e => { if (e.key === 'Enter') ytSearch(); };
+
+  // ---- tabs, PIN
+  document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+    const tab = b.dataset.tab;
+    document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.body.dataset.tab = tab;
+    for (const id of ['screen', 'bible', 'videos']) $('#' + id).hidden = tab !== id;
+    if (tab === 'videos' && !library.length) loadLibrary();
+    if (tab === 'bible' && !books.length) loadBooks();
+  });
+
+  // ---- Bible picker: book → chapter → verse; tapping a verse puts it on the screen
+  let books = [], sel = { book: null, chapter: null }, shownKey = '';
+  const chapters = new Map();
+  const bookOf = n => books.find(x => x.n === n);
+  // a heading of Arabic and English parts, each kept in its own direction, joined by " · " (reads right to left)
+  const heading = (el, ...parts) => el.replaceChildren(...parts.flatMap((p, i) => { const b = document.createElement('bdi'); b.textContent = p; return i ? [' · ', b] : [b]; }));
+  async function loadBooks() {
+    $('#otGrid').innerHTML = '<div class="empty">Loading the Bible…</div>';
+    const j = await act('books');
+    if (j && j.books) { books = j.books; renderBooks(); bStep('books'); }
+  }
+  function bStep(step) {
+    $('#bBooks').hidden = step !== 'books';
+    $('#bChapters').hidden = step !== 'chapters';
+    $('#bVerses').hidden = step !== 'verses';
+    const box = $('#crumbs'), bk = bookOf(sel.book);
+    box.innerHTML = '';
+    const add = (text, fn) => {
+      if (box.children.length) box.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
+      const b = document.createElement('button'); b.className = 'crumb'; b.textContent = text; b.disabled = !fn; if (fn) b.onclick = fn; box.appendChild(b);
+    };
+    add('📖 All books', step === 'books' ? null : () => bStep('books'));
+    if (step !== 'books' && bk) add(bk.ar, step === 'verses' && bk.ch > 1 ? () => openBook(bk.n) : null);
+    if (step === 'verses') add(`${bk.en} ${sel.chapter}`, null);
+    window.scrollTo(0, 0);
+  }
+  function renderBooks() {
+    const f = norm($('#bFind').value);
+    for (const [id, from, to] of [['#otGrid', 1, 39], ['#ntGrid', 40, 66]]) {
+      const box = $(id); box.innerHTML = '';
+      for (const b of books.filter(b => b.n >= from && b.n <= to && (!f || norm(b.ar).includes(f) || norm(b.en).includes(f)))) {
+        const el = document.createElement('button');
+        el.className = 'btn bk';
+        el.innerHTML = '<b dir="rtl"></b><small dir="ltr"></small>';   // ltr: "1 Samuel", not "Samuel 1"
+        el.querySelector('b').textContent = b.ar;
+        el.querySelector('small').textContent = b.en;
+        el.onclick = () => openBook(b.n);
+        box.appendChild(el);
+      }
+      box.previousElementSibling.hidden = !box.children.length;   // the testament heading
+    }
+  }
+  $('#bFind').oninput = renderBooks;
+  function openBook(n) {
+    const bk = bookOf(n); if (!bk) return;
+    sel = { book: n, chapter: null };
+    if (bk.ch === 1) { openChapter(1); return; }   // one-chapter books go straight to the verses
+    heading($('#chTitle'), bk.ar, bk.en, 'choose a chapter');
+    const grid = $('#chGrid'); grid.innerHTML = '';
+    for (let c = 1; c <= bk.ch; c++) {
+      const el = document.createElement('button'); el.className = 'btn'; el.textContent = c; el.onclick = () => openChapter(c); grid.appendChild(el);
+    }
+    bStep('chapters');
+  }
+  async function openChapter(c) {
+    const bk = bookOf(sel.book); if (!bk) return;
+    const key = sel.book + ':' + c;
+    let verses = chapters.get(key);
+    if (!verses) {
+      const j = await act('chapter', { book: sel.book, chapter: c });
+      if (!j || !j.verses) return;
+      verses = j.verses; chapters.set(key, verses);
+    }
+    sel.chapter = c;
+    heading($('#vTitle'), `${bk.ar} ${c}`, `${bk.en} ${c}`, 'tap a verse to show it');
+    const list = $('#vList'); list.innerHTML = '';
+    verses.forEach((text, i) => {
+      const v = i + 1, row = document.createElement('button');
+      row.className = 'vrow' + (shownKey === key + ':' + v ? ' on' : '');
+      row.dir = 'rtl';
+      row.innerHTML = '<span class="num"></span><span class="tx"></span>';
+      row.querySelector('.num').textContent = v;
+      row.querySelector('.tx').textContent = text;
+      row.onclick = async () => {
+        const j = await act('show-ref', { book: sel.book, chapter: c, verse: v });
+        if (!j) return;
+        shownKey = key + ':' + v;
+        list.querySelectorAll('.vrow.on').forEach(x => x.classList.remove('on'));
+        row.classList.add('on');
+        toast(j.message || 'On screen');
+        setTimeout(() => act('state'), 800);
+      };
+      list.appendChild(row);
+    });
+    const nav = $('#chNav'); nav.innerHTML = '';
+    const navBtn = (text, ch) => { const b = document.createElement('button'); b.className = 'btn'; b.textContent = text; b.disabled = !ch; b.style.visibility = ch ? '' : 'hidden'; if (ch) b.onclick = () => openChapter(ch); nav.appendChild(b); };
+    navBtn(`◀ Chapter ${c - 1}`, c > 1 ? c - 1 : 0);
+    navBtn(`Chapter ${c + 1} ▶`, c < bk.ch ? c + 1 : 0);
+    bStep('verses');
+  }
+  const connect = () => { pin = $('#pin').value.trim(); try { localStorage.setItem('vf.remotePin', pin); } catch { /* ignore */ } act('state'); };
+  $('#pinGo').onclick = connect;
+  $('#pin').onkeydown = e => { if (e.key === 'Enter') connect(); };
+
+  // ---- hold to speak: record while held, send when let go
+  let rec = null, chunks = [], stream = null, startedAt = 0, held = false;
+  const talk = $('#talk'), heard = $('#heard'), label = t => { $('#talkText').textContent = t; };
+  async function startTalk(e) {
+    e.preventDefault();
+    held = true;
+    try { talk.setPointerCapture(e.pointerId); } catch { /* ignore */ }   // sliding off the circle keeps recording
+    if (!pin) { heard.textContent = 'Enter the PIN first.'; return; }
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+      heard.textContent = 'The microphone needs the secure address: ' + location.href.replace(/^http:/, 'https:').replace(/:(\d+)\//, (m, p) => ':' + (+p + 393) + '/');
+      return;
+    }
+    try {
+      stream = stream || await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (!held) { heard.textContent = 'Microphone ready. Now hold the button while you speak.'; return; }   // let go while the phone asked for the mic
+      chunks = [];
+      rec = new MediaRecorder(stream);
+      rec.ondataavailable = ev => { if (ev.data.size) chunks.push(ev.data); };
+      rec.onstop = send;
+      rec.start();
+      startedAt = performance.now();
+      talk.classList.add('rec');
+      if (navigator.vibrate) navigator.vibrate(25);
+      label('Listening… let go to send');
+      heard.textContent = '';
+    } catch (err) { heard.textContent = 'Microphone not allowed: ' + err.message; }
+  }
+  function stopTalk() {
+    held = false;
+    if (!rec || rec.state !== 'recording') return;
+    talk.classList.remove('rec');
+    rec.stop();
+  }
+  async function send() {
+    if (performance.now() - startedAt < 400) { label('Hold to speak'); heard.textContent = 'Keep holding the button while you speak.'; return; }
+    const blob = new Blob(chunks, { type: (rec && rec.mimeType) || 'audio/webm' });
+    label('Sending…');
+    talk.classList.add('busy');
+    try {
+      const r = await fetch('/api/remote/voice?pin=' + encodeURIComponent(pin), { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
+      heard.textContent = (j.text ? '“' + j.text + '” — ' : '') + (j.message || '');
+      showCmdResult(j);
+      act('state');
+    } catch (err) { heard.textContent = 'Could not send: ' + err.message; }
+    finally { label('Hold to speak'); talk.classList.remove('busy'); }
+  }
+  talk.addEventListener('pointerdown', startTalk);
+  for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) talk.addEventListener(ev, stopTalk);
+  document.addEventListener('pointerup', () => { if (held) stopTalk(); });
+  talk.addEventListener('contextmenu', e => e.preventDefault());
+
+  if (pin) act('state');
+  setInterval(() => { if (pin && !pinBad && document.visibilityState === 'visible') act('state'); }, 2000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arabic Church Assistant</title>
+<link rel="stylesheet" href="styles.css">
+<script src="fonts.js"></script>
+<script>VF_loadCss('ui'); VF_loadCss('naskh');</script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <span class="brand-mark">✦</span>
+    <div class="brand-text">
+      <div class="brand-title">Arabic Church Assistant <span class="brand-by">by Sameh Welson Faragallah</span></div>
+      <div class="brand-sub" id="status">Loading…</div>
+    </div>
+  </div>
+
+  <div class="bar-controls">
+    <button id="listenBtn" class="btn btn-listen" disabled title="Start / stop listening (L)">
+      <span class="dot"></span><span id="listenLabel">Start listening</span>
+    </button>
+
+    <div class="input-picker">
+      <label class="field">
+        <span>Listen to</span>
+        <select id="inputSel" title="The pastor's microphone, this PC's own sound, or a recording to test with"></select>
+      </label>
+      <div class="meter" title="Input level: it should move when someone speaks. It turns green while the speech detector hears a voice.">
+        <div class="meter-fill" id="meterFill"></div>
+      </div>
+    </div>
+
+    <label class="field" title="Arabic + English: the speech engine notices by itself when the pastor switches to English">
+      <span>Language</span>
+      <select id="langSel">
+        <option value="auto">Arabic + English</option>
+        <option value="ar">Arabic only</option>
+        <option value="en">English only</option>
+      </select>
+    </label>
+
+    <label class="toggle" title="Put spoken references on screen without clicking Show">
+      <input type="checkbox" id="autoShow"><span class="track"><span class="thumb"></span></span><span>Auto-show</span>
+    </label>
+    <label class="toggle" title="Suggest verses the pastor quotes without naming them">
+      <input type="checkbox" id="quoteToggle"><span class="track"><span class="thumb"></span></span><span>Catch quotes</span>
+    </label>
+    <label class="toggle" title="Play a hymn on the display as soon as it is clearly announced («هنرنم ترنيمة …»)">
+      <input type="checkbox" id="videoAutoPlay"><span class="track"><span class="thumb"></span></span><span>Auto-play hymns</span>
+    </label>
+    <label class="toggle" title="While a verse is on screen and the pastor reads on into the next one, the screen follows">
+      <input type="checkbox" id="readAlong"><span class="track"><span class="thumb"></span></span><span>Follow reading</span>
+    </label>
+    <label class="toggle toggle-hold" title="Hold (H): verses are still found and listed, but nothing goes on screen by itself until you turn this off. For rehearsing with a recording, or when the detection is getting in the way.">
+      <input type="checkbox" id="holdToggle"><span class="track"><span class="thumb"></span></span><span>Hold</span>
+    </label>
+    <button class="btn btn-ghost" id="displayBtn" title="Open the display on the projector (or a window, with one screen)">Open display ↗</button>
+    <a class="btn btn-ghost" href="/settings" target="vf-settings" title="Microphone, display look, English, videos, phone remote (opens in its own window; listening carries on)">⚙ Settings</a>
+  </div>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<div id="testBar" class="testbar" hidden>
+  <span class="testbar-icon">▶</span>
+  <span class="testbar-name" id="testName"></span>
+  <input type="range" id="testSeek" min="0" max="100" value="0" step="0.1" title="Drag to jump in the recording">
+  <span class="testbar-time" id="testTime">0:00</span>
+  <button class="btn btn-small" id="testPause">Pause</button>
+  <button class="btn btn-small btn-danger" id="testStop">Stop test</button>
+</div>
+
+<main class="grid">
+  <!-- Transcript -->
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Live transcript</h2>
+      <span class="engine-chip" id="engineChip" title="The speech engine on this PC"></span>
+      <button class="btn btn-small btn-ghost" id="clearTranscript">Clear</button>
+    </div>
+    <div id="transcript" class="transcript" dir="rtl" lang="ar">
+      <p class="empty" dir="ltr">Press <b>Start listening</b>. What the pastor says appears here, in Arabic or English.<br>
+      No pastor handy? Choose <b>📁 Test with a recording or video…</b> under <i>Listen to</i>, or type a sentence below.</p>
+    </div>
+    <form id="simForm" class="sim">
+      <input id="simInput" dir="rtl" lang="ar" placeholder="اكتب جملة للتجربة… (type a sentence to test)">
+      <button class="btn btn-small" type="submit">Send</button>
+    </form>
+  </section>
+
+  <!-- Detected / Bible / Plan / Videos / History -->
+  <section class="panel">
+    <div class="panel-head">
+      <div class="tabs">
+        <button class="tab on" data-tab="detected">Detected</button>
+        <button class="tab" data-tab="bible">📖 Bible</button>
+        <button class="tab" data-tab="plan">📋 Plan <span class="count" id="planCount"></span></button>
+        <button class="tab" data-tab="videos">🎵 Videos <span class="count" id="videoCount"></span></button>
+        <button class="tab" data-tab="history">🕘 History</button>
+      </div>
+      <button class="btn btn-small btn-ghost" id="clearCards">Clear</button>
+    </div>
+    <div class="tabpane" id="paneDetected">
+      <form id="searchForm" class="search">
+        <input id="searchInput" dir="auto" placeholder="Find a verse: يوحنا ٣ ١٦ · John 3:16 · or words from it: هكذا أحب الله">
+        <button class="btn btn-small" type="submit">Find</button>
+      </form>
+      <div id="searchResults" class="search-results" hidden></div>
+      <div id="cards" class="cards">
+        <p class="empty">Verses, and hymn videos from your playlists, show up here as the pastor mentions them. Click <b>Show</b> or <b>Play</b> to put one on screen.</p>
+      </div>
+    </div>
+    <div class="tabpane" id="paneBible" hidden>
+      <div class="picker-head">
+        <nav class="picker-crumbs" id="pickerCrumbs"></nav>
+        <input id="pickerFilter" dir="auto" placeholder="Find a book… سفر · John">
+      </div>
+      <div id="pickerBody" class="picker-body"></div>
+    </div>
+    <div class="tabpane" id="panePlan" hidden>
+      <div class="plan-head">
+        <p class="note">Before the service, list the verses (and hymns) the pastor plans to use. One click shows each one; <b>Next in plan</b> (<kbd>N</kbd>) goes down the list.</p>
+        <textarea id="planInput" dir="auto" rows="3" placeholder="One per line: يوحنا ٣: ١٦ · رومية ٨: ٢٨-٣٠ · John 14:6 · or a hymn title"></textarea>
+        <div class="btnrow">
+          <button class="btn btn-small btn-primary" id="planAdd">Add to plan</button>
+          <button class="btn btn-small" id="planNext">Next in plan ▶</button>
+          <button class="btn btn-small btn-ghost" id="planClear">Clear the plan</button>
+        </div>
+      </div>
+      <div id="planList" class="plan-list"></div>
+    </div>
+    <div class="tabpane" id="paneVideos" hidden>
+      <form id="playlistForm" class="search">
+        <input id="playlistInput" dir="ltr" placeholder="Paste a YouTube playlist, video or channel link">
+        <button class="btn btn-small" type="submit" id="playlistAdd" title="Add it to your playlists: these titles are listened for, and a hymn from them plays when it is announced">Add</button>
+        <button class="btn btn-small btn-ghost" type="button" id="songsAdd" title="Add every title of this playlist or channel to the song database. Nothing in the database plays by itself: it is searched when an announced hymn is not in your playlists, and by the search box below.">＋ Song database</button>
+      </form>
+      <div class="video-tools">
+        <label class="toggle" title="Notice when a video title from these playlists is said">
+          <input type="checkbox" id="videoDetect"><span class="track"><span class="thumb"></span></span><span>Detect titles</span>
+        </label>
+      </div>
+      <form id="ytForm" class="search yt-search">
+        <input id="ytInput" dir="auto" placeholder="Search all of YouTube… (ترنيمة, a song, a sermon)">
+        <button class="btn btn-small" type="submit" id="ytGo">Search YouTube</button>
+      </form>
+      <div id="ytResults" class="yt-results" hidden></div>
+      <div id="videoMentioned" class="video-mentioned" hidden><h3 class="picker-group">Just mentioned</h3><div id="videoMentionedList"></div></div>
+      <div id="playlists" class="playlists"></div>
+      <details id="songDb" class="song-db" hidden><summary></summary><div id="songSources" class="playlists"></div></details>
+      <input id="videoFilter" class="video-filter" dir="auto" placeholder="Search your playlists and the song database…">
+      <div id="videoList" class="video-list">
+        <p class="empty">Paste a YouTube playlist link above. Its titles are saved on this PC, and when the speaker says one of them it shows up highlighted.</p>
+      </div>
+    </div>
+    <div class="tabpane" id="paneHistory" hidden>
+      <div class="history-head">
+        <select id="historyDay"></select>
+        <button class="btn btn-small" id="historyExport" title="Save this service's verses and transcript as a text file">Save as text…</button>
+        <button class="btn btn-small btn-ghost" id="historyFolder" title="Open the folder with all the services">Open folder</button>
+      </div>
+      <div id="historyBody" class="history-body"></div>
+    </div>
+  </section>
+
+  <!-- On screen -->
+  <section class="panel panel-screen">
+    <div class="panel-head">
+      <h2>On screen</h2>
+      <span class="live-pill" id="livePill">Nothing showing</span>
+    </div>
+    <div class="preview-wrap"><iframe id="preview" src="/display?obs=1&amp;embed=1" title="Display preview" tabindex="-1"></iframe></div>
+    <div class="screen-controls video-controls" id="videoControls" hidden>
+      <button class="btn" id="vidPause">⏸ Pause</button>
+      <button class="btn" id="vidRestart">⟲ Restart</button>
+      <button class="btn btn-danger" id="vidStop">■ Stop video</button>
+    </div>
+    <div class="video-progress" id="videoProgress" hidden>
+      <div class="vp-row">
+        <span class="vp-time" id="vidTime">0:00</span>
+        <input type="range" id="vidPos" min="0" max="0" step="1" value="0" aria-label="Video position" title="Drag to go to another part of the video">
+        <span class="vp-time" id="vidDur">0:00</span>
+      </div>
+      <div class="vp-row">
+        <button class="btn btn-small" id="vidBack" title="Back 10 seconds">⏪ 10s</button>
+        <button class="btn btn-small" id="vidFwd" title="Forward 10 seconds">10s ⏩</button>
+        <span class="vp-state" id="vidState"></span>
+        <button class="btn btn-small" id="vidMute" title="Mute / unmute the video">🔊</button>
+        <input type="range" id="vidVol" min="0" max="100" step="1" value="100" aria-label="Volume" title="Video volume">
+        <span class="vp-time" id="vidVolN">100%</span>
+      </div>
+    </div>
+    <div class="screen-controls">
+      <button class="btn" id="prevBtn" title="Previous verse (←)">◀ Prev</button>
+      <button class="btn" id="nextBtn" title="Next verse (→)">Next ▶</button>
+      <button class="btn" id="backBtn" title="Back to what was on screen before: undoes a wrong change (Backspace)">⟲ Back</button>
+      <button class="btn btn-danger" id="clearBtn" title="Clear the screen (Esc)">Clear screen</button>
+    </div>
+    <details class="howto message-box" id="messageBox">
+      <summary>✎ Put a message on screen</summary>
+      <input id="msgTitle" dir="auto" placeholder="Title (optional) — e.g. إعلانات · Announcements">
+      <textarea id="msgText" dir="auto" rows="3" placeholder="The message: a sermon title, prayer points, an announcement…"></textarea>
+      <div class="btnrow"><button class="btn btn-small btn-primary" id="msgShow">Show on screen</button></div>
+    </details>
+    <div class="hint">
+      <b>Keys</b>: <kbd>Enter</kbd> show newest · <kbd>←</kbd>/<kbd>→</kbd> verse · <kbd>⌫</kbd> back · <kbd>Esc</kbd> clear · <kbd>H</kbd> hold · <kbd>L</kbd> listen · <kbd>N</kbd> next in plan · <kbd>B</kbd> Bible · <kbd>/</kbd> find
+    </div>
+    <details class="howto">
+      <summary>Display links for OBS / ProPresenter / another PC</summary>
+      <p>The look (font, background, layout, English) comes from <a href="/settings" target="vf-settings">Settings</a> and applies to every screen.
+         A link built here overrides it for one screen only, e.g. a lower third in OBS while the projector stays full screen.</p>
+      <div class="link-builder">
+        <select id="lbLayout"><option value="">Layout: from Settings</option><option value="full">Full screen</option><option value="lower">Lower third</option></select>
+        <select id="lbBg"><option value="">Background: from Settings</option><option value="dark">Dark</option><option value="black">Black</option><option value="light">Light</option><option value="transparent">Transparent</option><option value="green">Green screen</option></select>
+        <label><input type="checkbox" id="lbEn"> English</label>
+        <input id="lbUrl" readonly title="Click to select, then copy">
+      </div>
+      <p class="note" id="lanNote"></p>
+    </details>
+  </section>
+</main>
+
+<input type="file" id="fileInput" accept="audio/*,video/*,.mp3,.m4a,.wav,.mp4,.aac,.ogg,.webm,.mkv,.mov,.wma" hidden>
+
+<template id="songsCardTpl">
+  <article class="card video-card songs-card">
+    <div class="card-top">
+      <span class="badge video">Hymn announced</span>
+      <span class="time"></span>
+      <button class="x" title="Dismiss">×</button>
+    </div>
+    <div class="card-note"></div>
+    <div class="sc-list"></div>
+    <div class="card-actions">
+      <button class="btn btn-small btn-ghost sc-yt" title="Look for it on YouTube (Videos tab)">Search YouTube for it</button>
+    </div>
+  </article>
+</template>
+
+<template id="videoCardTpl">
+  <article class="card video-card">
+    <div class="card-top">
+      <span class="badge video">Hymn / video</span>
+      <span class="time"></span>
+      <button class="x" title="Dismiss">×</button>
+    </div>
+    <div class="vc-body">
+      <img class="vc-thumb" alt="" loading="lazy">
+      <div class="vc-text">
+        <div class="vc-title" dir="auto"></div>
+        <div class="card-note"></div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <a class="btn btn-small btn-ghost vc-open" target="_blank" rel="noopener">Open on YouTube ↗</a>
+      <button class="btn btn-primary btn-play">▶ Play on screen</button>
+    </div>
+  </article>
+</template>
+
+<template id="cardTpl">
+  <article class="card">
+    <div class="card-top">
+      <span class="badge"></span>
+      <span class="time"></span>
+      <button class="x" title="Dismiss">×</button>
+    </div>
+    <div class="card-label" dir="rtl" lang="ar"></div>
+    <div class="card-label-en"></div>
+    <div class="card-text" dir="rtl" lang="ar"></div>
+    <div class="card-note"></div>
+    <div class="card-also"></div>
+    <div class="verse-grid" hidden></div>
+    <div class="card-actions">
+      <button class="btn btn-small btn-ghost btn-never" hidden title="Card only: quoted words will never put this verse on screen by themselves (for a line that is said every week). A spoken reference still does.">Card only</button>
+      <button class="btn btn-small btn-ghost btn-plan" title="Add to the service plan">＋ Plan</button>
+      <button class="btn btn-primary btn-show">Show</button>
+    </div>
+  </article>
+</template>
+
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Speech engine (installed by Setup.bat into engine\python). torch is installed first, separately,
+# with the graphics-card (CUDA) build when there is an NVIDIA card.
+transformers==5.23.0
+huggingface_hub
+sentencepiece
+protobuf
+numpy
+onnxruntime
+soundcard
+sounddevice
+av
+websockets>=15

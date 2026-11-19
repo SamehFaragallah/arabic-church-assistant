@@ -1,0 +1,35 @@
+# What each PC keeps for itself: settings and keys (the paid speech services' keys, the phone PIN), and the record of
+# every service (history, logs, sound recordings). None of it belongs in the code.
+settings.json
+settings.json.tmp
+settings.broken.json
+data/chrome-speech/
+data/history/
+data/logs/
+data/recordings/
+data/uploads/
+data/plan.json
+data/usage.json
+data/videos.json
+data/phrases.json
+data/remote-cert.pfx
+data/*.tmp
+
+# Downloaded or made by Setup.bat and the app
+bin/
+engine/python/
+engine/python.tmp/
+engine/.venv/
+engine/models/
+node_modules/
+__pycache__/
+*.pyc
+
+# The Hugging Face sign-in that goes in the download zip only
+engine/hf-token.json
+
+# Recordings of sermons used for trying the speech engines
+test-clips/
+
+# Shortcuts made on this PC
+*.lnk

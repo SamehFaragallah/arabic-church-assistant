@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="ar">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verse Display</title>
+<style>
+  :root {
+    --bg: radial-gradient(ellipse at 50% 30%, #1d2230 0%, #0b0d12 70%);
+    --text: #f4f1ea;
+    --label: #d9b26a;
+    --en: #b9b4a8;
+    --scale: 1;
+    --fontscale: 1;
+    --lh: 1.8;
+    --ar: "Noto Naskh Arabic", "Traditional Arabic", "Arabic Typesetting", "Segoe UI", serif;
+    --enfont: "EB Garamond", Georgia, serif;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: var(--bg); color: var(--text); font-family: var(--ar); cursor: default; }
+  body.bg-black { --bg: #000; }
+  body.bg-light { --bg: #f7f3ea; --text: #1d1a14; --label: #8a6420; --en: #5d574c; }
+  body.bg-transparent { --bg: transparent; }
+  body.bg-green { --bg: #00b140; }
+
+  .stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 6vh 7vw; }
+  /* Verse changes (Settings → Between verses): the old verse leaves (.out), the new one comes in (.on).
+     --t-in / --t-out are where it comes from / goes to; --tdur / --tout how long that takes. */
+  .slide { width: 100%; max-height: 100%; display: flex; flex-direction: column; align-items: center; text-align: center;
+           opacity: 0; transform: var(--t-in, translateY(12px));
+           transition: opacity var(--tdur, .45s) ease, transform var(--tdur, .45s) cubic-bezier(.2, .7, .2, 1); }
+  .slide.on { opacity: 1; transform: none; }
+  .slide.out { opacity: 0; transform: var(--t-out, none); transition-duration: var(--tout, .22s); transition-timing-function: ease-in; }
+  .slide.jump { transition: none !important; }
+  .label { color: var(--label); font-weight: 700; font-size: calc(4.2vh * var(--scale)); margin-bottom: 2.4vh; letter-spacing: .3px; }
+  /* (kept apart from the Arabic before it: the 1 of "1 John 4:21" otherwise joins the Arabic number, «٢١1 John 4:21») */
+  .label .en { font-family: var(--enfont); font-weight: 400; font-size: .7em; opacity: .85; margin-inline-start: .8em; direction: ltr; unicode-bidi: isolate; }
+  .text { direction: rtl; font-size: calc(var(--fs, 7vh) * var(--scale) * var(--fontscale)); line-height: var(--lh); max-width: 1700px; }
+  .text sup { color: var(--label); font-size: .45em; margin-inline: .25em; vertical-align: .9em; }
+  .text.msg { white-space: pre-line; font-family: var(--ar); unicode-bidi: plaintext; }
+  .label.msg { unicode-bidi: plaintext; }
+  .entext { direction: ltr; font-family: var(--enfont); color: var(--en); font-size: calc(var(--fs, 7vh) * .5 * var(--scale)); line-height: 1.5; margin-top: 3vh; max-width: 1600px; }
+  .entext sup { font-size: .6em; margin-inline: .2em; }
+  .entext .ver { font-size: .62em; letter-spacing: .08em; opacity: .75; margin-inline-start: .6em; white-space: nowrap; }
+
+  /* lower third (livestream overlay) */
+  body.lower .stage { align-items: flex-end; padding: 0 4vw 5vh; }
+  body.lower .slide { background: rgba(10, 12, 18, .86); border-radius: 18px; padding: 2.6vh 3vw; border-top: 3px solid var(--label);
+                      max-height: 38vh; align-items: stretch; text-align: right; }
+  body.lower.bg-light .slide { background: rgba(255, 255, 255, .92); }
+  body.lower .label { font-size: calc(3vh * var(--scale)); margin-bottom: 1vh; text-align: right; }
+  body.lower .text { line-height: calc(var(--lh) - .15); max-width: none; }
+  body.lower .entext { text-align: left; margin-top: 1.2vh; max-width: none; }
+
+  /* YouTube video */
+  .video { position: absolute; inset: 0; background: #000; }
+  .video iframe, .video #ytbox { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  /* the video's own picture over YouTube's play button and title while the video loads; fades into the video once it plays */
+  .video .cover { position: absolute; inset: 0; z-index: 2; background: #000 center / cover no-repeat; pointer-events: none; transition: opacity .5s; }
+  .video .cover.gone { opacity: 0; }
+  .video.thumb { background: #000 center / cover no-repeat; display: flex; align-items: flex-end; }
+  .video.thumb .cap { width: 100%; padding: 4vh 5vw; background: linear-gradient(transparent, rgba(0,0,0,.85)); color: #fff;
+                      font: 600 3.2vh/1.4 var(--ar); direction: rtl; text-align: right; }
+  .video.thumb .cap small { display: block; font: 400 2.2vh "Segoe UI", system-ui, sans-serif; opacity: .8; direction: ltr; text-align: left; }
+  .hint { position: fixed; left: 50%; bottom: 4vh; transform: translateX(-50%); font: 15px/1.4 "Segoe UI", system-ui, sans-serif;
+          background: rgba(0, 0, 0, .7); color: #fff; padding: 10px 18px; border-radius: 10px; transition: opacity .6s; direction: ltr; }
+  .hint.gone { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="stage"><div class="slide" id="slide">
+  <div class="label" id="label"></div>
+  <div class="text" id="text"></div>
+  <div class="entext" id="entext" hidden></div>
+</div></div>
+<div class="video" id="video" hidden><div id="ytbox"></div></div>
+<div class="hint gone" id="hint">Double-click (or press F11) for full screen</div>
+<script src="fonts.js"></script>
+<script>
+(function () {
+  // Look comes from Settings (settings.json). Options in the link override them for that screen,
+  // e.g. /display?layout=lower&bg=transparent for an OBS overlay.
+  const q = new URLSearchParams(location.search);
+  const body = document.body, root = document.documentElement;
+  const slide = document.getElementById('slide');
+  const label = document.getElementById('label');
+  const text = document.getElementById('text');
+  const entext = document.getElementById('entext');
+  let lastAt = 0, lastScreen = null;
+  let cfg = { font: 'naskh', layout: 'full', background: 'dark', showEnglish: false, textSize: 1, tashkeel: true, transition: 'rise', transitionMs: 450, showReference: true };
+  // where a verse comes in from / goes out to, for each "Between verses" choice
+  const TRANSITIONS = {
+    rise: ['translateY(2.2vh)', 'none'],
+    fade: ['none', 'none'],
+    slideup: ['translateY(14vh)', 'translateY(-14vh)'],
+    slide: ['translateX(-16vw)', 'translateX(16vw)'],     // the next verse comes in from the left (Arabic reads right to left)
+    zoom: ['scale(.9)', 'scale(1.06)'],
+    none: ['none', 'none'],
+  };
+  function transMs() {
+    const c = effective();
+    if (c.transition === 'none') return 0;
+    const ms = Number(c.transitionMs);
+    return Number.isFinite(ms) ? Math.max(0, Math.min(3000, ms)) : 450;
+  }
+
+  function effective() {
+    const c = Object.assign({}, cfg);
+    if (q.get('font')) c.font = q.get('font');
+    if (q.get('layout')) c.layout = q.get('layout');
+    if (q.get('bg')) c.background = q.get('bg');
+    if (q.get('en') !== null) c.showEnglish = q.get('en') === '1';
+    if (q.get('size')) c.textSize = parseFloat(q.get('size')) || 1;
+    if (q.get('tashkeel') !== null) c.tashkeel = q.get('tashkeel') !== '0';
+    return c;
+  }
+
+  function applyConfig() {
+    const c = effective();
+    body.classList.toggle('lower', c.layout === 'lower');
+    for (const b of ['black', 'light', 'transparent', 'green']) body.classList.toggle('bg-' + b, c.background === b);
+    const f = window.VF_loadFont(c.font);
+    root.style.setProperty('--ar', `"${f.name}", "Traditional Arabic", "Arabic Typesetting", "Segoe UI", serif`);
+    root.style.setProperty('--fontscale', f.scale);
+    root.style.setProperty('--lh', f.lh);
+    root.style.setProperty('--scale', c.textSize || 1);
+    const tr = TRANSITIONS[c.transition] || TRANSITIONS.rise, ms = transMs();
+    root.style.setProperty('--t-in', tr[0]);
+    root.style.setProperty('--t-out', tr[1]);
+    root.style.setProperty('--tdur', ms + 'ms');
+    root.style.setProperty('--tout', Math.round(ms * 0.5) + 'ms');
+    if (c.showEnglish) window.VF_loadCss('en');
+    if (document.fonts) document.fonts.load(`700 40px "${f.name}"`).then(refit).catch(() => {});
+    if (lastScreen && (lastScreen.type === 'show' || lastScreen.type === 'message')) draw(lastScreen);
+  }
+
+  // remove harakat but keep letters and hamza forms; alef wasla -> alef
+  const HARAKAT = /[ؐ-ًؚ-ٰٟۖ-ۜ۟-۪ۨ-ۭ]/g;
+  const plain = s => String(s || '').replace(HARAKAT, '').replace(/ٱ/g, 'ا');
+  const toAr = n => String(n).replace(/\d/g, d => '٠١٢٣٤٥٦٧٨٩'[d]);
+
+  function fill(el, verses, ar, tashkeel) {
+    el.textContent = '';
+    const multi = verses.length > 1;
+    verses.forEach((v, i) => {
+      if (multi) { const s = document.createElement('sup'); s.textContent = ar ? toAr(v.n) : v.n; el.appendChild(s); }
+      const t = ar && !tashkeel ? plain(v.text) : v.text;
+      el.appendChild(document.createTextNode(t + (i < verses.length - 1 ? ' ' : '')));
+    });
+  }
+
+  // shrink the text until it fits the screen
+  function fit() {
+    const lower = body.classList.contains('lower');
+    let fs = lower ? 4.6 : 7.2;
+    const limit = lower ? window.innerHeight * 0.38 : window.innerHeight * 0.88;
+    for (let i = 0; i < 40; i++) {
+      for (const el of [slide, text, entext]) el.style.setProperty('--fs', fs + 'vh');
+      if (slide.scrollHeight <= limit || fs < 2) break;
+      fs *= 0.93;
+    }
+  }
+  function refit() { if (slide.classList.contains('on')) fit(); }
+
+  function draw(s) {
+    const c = effective();
+    if (s.type === 'message') {                       // a message of the operator's own
+      label.textContent = s.title || '';
+      label.hidden = !s.title;
+      label.classList.add('msg');
+      text.dir = 'auto';
+      text.classList.add('msg');
+      text.textContent = s.text || '';
+      entext.hidden = true;
+      fit();
+      return;
+    }
+    text.dir = 'rtl';
+    text.classList.remove('msg');
+    label.classList.remove('msg');
+    label.hidden = c.showReference === false;
+    // English underneath: when chosen in Settings, or always for a verse the speaker said in English
+    const showEn = (c.showEnglish || s.forceEnglish) && q.get('en') !== '0';
+    label.textContent = '';
+    const ar = document.createElement('span'); ar.dir = 'rtl'; ar.textContent = s.label || ''; label.appendChild(ar);
+    if (showEn && s.labelEn) { const e = document.createElement('span'); e.className = 'en'; e.dir = 'ltr'; e.textContent = s.labelEn; label.appendChild(e); }
+    fill(text, s.verses || [], true, c.tashkeel);
+    if (showEn && s.en && s.en.length) {
+      fill(entext, s.en, false);
+      if (s.enVersion) { const v = document.createElement('span'); v.className = 'ver'; v.textContent = s.enVersion; entext.appendChild(v); }
+      entext.hidden = false;
+      if (s.fumsId) reportFums(s.fumsId);
+      if (c.showEnglish === false) window.VF_loadCss('en');
+    } else entext.hidden = true;
+    fit();
+  }
+  // API.Bible asks apps to report each time its copyrighted text is shown (FUMS)
+  let fumsLoaded = null;
+  function reportFums(id) {
+    if (inFrame || q.get('sample')) return;
+    if (!fumsLoaded) {
+      fumsLoaded = new Promise(res => {
+        window._BAPI = window._BAPI || {};
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.scripture.api.bible/fums/fumsv2.min.js';
+        sc.onload = res; sc.onerror = res;
+        document.head.appendChild(sc);
+      });
+    }
+    fumsLoaded.then(() => { try { if (window._BAPI && window._BAPI.t) window._BAPI.t(id); } catch (e) { /* ignore */ } });
+  }
+
+  let swapTimer = null;
+  function render(s) {
+    if (s.at && s.at < lastAt) return;
+    lastAt = s.at || Date.now();
+    lastScreen = s;
+    const ms = transMs();
+    const wasOn = slide.classList.contains('on');
+    slide.classList.remove('on');
+    if (wasOn && ms) slide.classList.add('out');           // the old verse leaves …
+    clearTimeout(swapTimer);
+    const enter = () => {
+      if (lastScreen !== s) return;
+      slide.classList.add('jump');                         // … then, unseen, move to where the new one comes in from
+      slide.classList.remove('out');
+      void slide.offsetWidth;
+      slide.classList.remove('jump');
+      if (s.type !== 'show' && s.type !== 'message') return;
+      draw(s);
+      void slide.offsetWidth;
+      slide.classList.add('on');                           // … and the new verse comes in
+    };
+    if (wasOn && ms) swapTimer = setTimeout(enter, Math.round(ms * 0.5)); else enter();
+  }
+
+  // Settings page preview: /display?sample=1 shows a sample verse ("Try it" alternates two verses)
+  const SAMPLES = [
+    { label: 'يوحنا ٣: ١٦', labelEn: 'John 3:16',
+      verses: [{ n: 16, text: 'لِأَنَّهُ هَكَذَا أَحَبَّ ٱللَّهُ ٱلْعَالَمَ حَتَّى بَذَلَ ٱبْنَهُ ٱلْوَحِيدَ، لِكَيْ لَا يَهْلِكَ كُلُّ مَنْ يُؤْمِنُ بِهِ، بَلْ تَكُونُ لَهُ ٱلْحَيَاةُ ٱلْأَبَدِيَّةُ.' }],
+      en: [{ n: 16, text: 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.' }] },
+    { label: 'يوحنا ٣: ١٧', labelEn: 'John 3:17',
+      verses: [{ n: 17, text: 'لِأَنَّهُ لَمْ يُرْسِلِ ٱللهُ ٱبْنَهُ إِلَى ٱلْعَالَمِ لِيَدِينَ ٱلْعَالَمَ، بَلْ لِيَخْلُصَ بِهِ ٱلْعَالَمُ.' }],
+      en: [{ n: 17, text: 'For God sent not his Son into the world to condemn the world; but that the world through him might be saved.' }] },
+  ];
+  let sampleNo = 0;
+  if (q.get('sample')) render(Object.assign({ type: 'show', at: 1 }, SAMPLES[0]));
+
+  // Opened as its own window from the console: double-click toggles full screen
+  const hint = document.getElementById('hint');
+  const inFrame = window.self !== window.top;
+  if (q.get('desktop') && window.vfDesktop) {
+    document.addEventListener('dblclick', () => window.vfDesktop.toggleDisplayFullscreen());
+    let idle;
+    body.style.cursor = 'none';
+    document.addEventListener('mousemove', () => { body.style.cursor = 'default'; clearTimeout(idle); idle = setTimeout(() => { body.style.cursor = 'none'; }, 2000); });
+  } else if (!inFrame && !q.get('sample') && !q.get('obs')) {
+    const showHint = () => { if (!document.fullscreenElement) { hint.classList.remove('gone'); clearTimeout(showHint.t); showHint.t = setTimeout(() => hint.classList.add('gone'), 5000); } };
+    showHint();
+    document.addEventListener('dblclick', () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+      else root.requestFullscreen().catch(() => {});
+    });
+    document.addEventListener('fullscreenchange', () => { if (document.fullscreenElement) hint.classList.add('gone'); else showHint(); });
+    let idle;
+    document.addEventListener('mousemove', () => { body.style.cursor = 'default'; clearTimeout(idle); idle = setTimeout(() => { body.style.cursor = 'none'; }, 2500); });
+  }
+
+  // ------------------------------------------------------------------ YouTube videos
+  // Plays on real display windows (projector). The console preview and lower-third / OBS overlays
+  // show a still picture instead, so the sound doesn't play twice. ?video=1 / ?video=0 overrides.
+  const videoBox = document.getElementById('video');
+  let player = null, playerId = null, ytApi = null, reportTimer = null, startedAt = 0, showSeq = 0;
+  function canPlayVideo() {
+    if (q.get('video') === '1') return true;
+    if (q.get('video') === '0' || inFrame || q.get('obs') || q.get('sample')) return false;
+    return effective().layout !== 'lower';
+  }
+  function loadYT() {
+    if (ytApi) return ytApi;
+    ytApi = new Promise((resolve, reject) => {
+      if (window.YT && window.YT.Player) return resolve(window.YT);
+      const prev = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => { if (prev) prev(); resolve(window.YT); };
+      const sc = document.createElement('script');
+      sc.src = 'https://www.youtube.com/iframe_api';
+      sc.onerror = () => { ytApi = null; reject(new Error('YouTube could not be reached — is this PC online?')); };
+      document.head.appendChild(sc);
+      setTimeout(() => { if (!(window.YT && window.YT.Player)) { ytApi = null; reject(new Error('YouTube did not load (no internet?)')); } }, 15000);
+    });
+    return ytApi;
+  }
+  function report(state, extra) {
+    if (!canPlayVideo()) return;
+    fetch('/api/video/status', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ id: playerId, state }, extra || {})) }).catch(() => {});
+  }
+  function stopVideo() {
+    clearInterval(reportTimer);
+    if (player && player.destroy) { try { player.destroy(); } catch { /* ignore */ } }
+    player = null; playerId = null;
+    videoBox.hidden = true;
+    videoBox.classList.remove('thumb');
+    videoBox.style.backgroundImage = '';
+    videoBox.innerHTML = '<div id="ytbox"></div>';
+  }
+  async function showVideo(v, paused) {
+    slide.classList.remove('on');
+    if (!canPlayVideo()) {
+      stopVideo();
+      if (effective().layout === 'lower' && !inFrame) return;      // overlays stay empty
+      videoBox.hidden = false;
+      videoBox.classList.add('thumb');
+      videoBox.style.backgroundImage = `url(https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/hqdefault.jpg)`;
+      videoBox.innerHTML = '<div class="cap"></div>';
+      const cap = videoBox.querySelector('.cap');
+      cap.textContent = v.title || '';
+      const sm = document.createElement('small'); sm.textContent = '▶ Playing on the display'; cap.appendChild(sm);
+      return;
+    }
+    // The first time, YouTube's player library takes a moment to load. The same video can be asked for again
+    // meanwhile (the live connection re-sends what is on screen): that must not make a second, hidden player,
+    // or the console's pause / position / volume would control the wrong one.
+    if (playerId === v.id) return;
+    stopVideo();
+    playerId = v.id;
+    const mySeq = ++showSeq;
+    videoBox.hidden = false;
+    const cover = document.createElement('div'); cover.className = 'cover';
+    cover.style.backgroundImage = `url(https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/hqdefault.jpg)`;   // the picture YouTube shows, minus its play button
+    videoBox.appendChild(cover);
+    let YTref;
+    try { YTref = await loadYT(); } catch (e) { report('error', { message: e.message }); stopVideo(); return; }
+    if (playerId !== v.id || mySeq !== showSeq) return;
+    startedAt = Date.now();
+    player = new YTref.Player('ytbox', {
+      videoId: v.id,
+      playerVars: { autoplay: 1, controls: 0, rel: 0, modestbranding: 1, iv_load_policy: 3, playsinline: 1, fs: 0, disablekb: 1, origin: location.origin },
+      events: {
+        onReady: e => {
+          applyAudio(e.target, v.volume, v.muted);
+          if (!paused) e.target.playVideo();
+        },
+        onStateChange: e => {
+          if (e.data === YTref.PlayerState.ENDED) { report('ended'); }
+          if (e.data === YTref.PlayerState.PLAYING) {
+            report('playing', { time: e.target.getCurrentTime(), duration: e.target.getDuration() });
+            const c = videoBox.querySelector('.cover');   // the first frame is up: fade the black cover away
+            if (c && !c.classList.contains('gone')) { setTimeout(() => c.classList.add('gone'), 250); setTimeout(() => c.remove(), 900); }
+          }
+        },
+        onError: e => {
+          const msg = { 2: 'bad video link', 5: 'the video cannot play in this browser', 100: 'the video was removed or is private', 101: 'the owner does not allow it to be played outside YouTube', 150: 'the owner does not allow it to be played outside YouTube' }[e.data] || 'error ' + e.data;
+          report('error', { message: 'YouTube: ' + msg });
+        },
+      },
+    });
+    clearInterval(reportTimer);
+    reportTimer = setInterval(() => {
+      if (!player || !player.getPlayerState) return;
+      const st = player.getPlayerState();
+      if (st === YTref.PlayerState.PLAYING || st === YTref.PlayerState.PAUSED) {
+        report(st === YTref.PlayerState.PLAYING ? 'playing' : 'paused', { time: player.getCurrentTime(), duration: player.getDuration(),
+          volume: player.getVolume ? player.getVolume() : undefined, muted: player.isMuted ? player.isMuted() : undefined });
+      } else if (Date.now() - startedAt > 6000 && st !== YTref.PlayerState.ENDED && st !== YTref.PlayerState.BUFFERING) {
+        report('blocked', { message: 'The display did not start the video by itself — click once on the display window, then press Play again.' });
+        startedAt = Date.now() + 60000;
+      }
+    }, 1000);
+  }
+  function applyAudio(p, volume, muted) {
+    try {
+      if (typeof volume === 'number') p.setVolume(Math.max(0, Math.min(100, volume)));
+      if (muted === true) p.mute(); else if (muted === false) p.unMute();
+    } catch { /* player not ready */ }
+  }
+  function videoControl(d) {
+    if (!player || !player.playVideo) return;
+    const action = d.action;
+    if (action === 'pause') player.pauseVideo();
+    else if (action === 'resume') player.playVideo();
+    else if (action === 'restart') { player.seekTo(0, true); player.playVideo(); }
+    else if (action === 'seek') player.seekTo(Math.max(0, +d.t || 0), true);
+    else if (action === 'skip') {
+      const dur = player.getDuration ? player.getDuration() : 0;
+      const t = Math.max(0, (player.getCurrentTime ? player.getCurrentTime() : 0) + (+d.by || 0));
+      player.seekTo(dur ? Math.min(t, dur - 0.5) : t, true);
+    }
+    else if (action === 'volume') applyAudio(player, d.volume, d.muted);
+    // tell the console right away, so its slider and clock don't wait for the next update
+    setTimeout(() => {
+      if (!player || !player.getPlayerState) return;
+      const st = player.getPlayerState();
+      if (st === 1 || st === 2) report(st === 1 ? 'playing' : 'paused', { time: player.getCurrentTime(), duration: player.getDuration(),
+        volume: player.getVolume ? player.getVolume() : undefined, muted: player.isMuted ? player.isMuted() : undefined });
+    }, 250);
+  }
+
+  applyConfig();
+  window.addEventListener('resize', refit);
+  window.addEventListener('vf-font-loaded', refit);
+  function onScreen(sc) {
+    if (sc.type === 'video' && sc.video) { lastScreen = null; showVideo(Object.assign({}, sc.video, { volume: sc.volume, muted: sc.muted }), sc.paused); }
+    else { stopVideo(); render(sc); }
+  }
+  // Previews inside the console / Settings page (?embed=1) are fed by that page instead of opening their
+  // own connection: Chrome allows only a few live connections to the app at once.
+  const embedded = inFrame && q.get('embed') === '1';
+  window.addEventListener('message', e => {
+    if (e.origin !== location.origin || !e.data) return;
+    if (e.data.vfSettings) { cfg = Object.assign(cfg, e.data.vfSettings); applyConfig(); }   // live preview from Settings (before saving)
+    if (e.data.vfScreen && embedded && !q.get('sample')) onScreen(e.data.vfScreen);
+    if (e.data.vfReplay && q.get('sample')) { sampleNo = 1 - sampleNo; render(Object.assign({ type: 'show', at: Date.now() }, SAMPLES[sampleNo])); }
+  });
+  if (!embedded) {
+    const es = new EventSource('/api/events');
+    es.addEventListener('settings', e => { cfg = Object.assign(cfg, JSON.parse(e.data)); applyConfig(); });
+    if (!q.get('sample')) {
+      es.addEventListener('screen', e => onScreen(JSON.parse(e.data)));
+      es.addEventListener('video-control', e => videoControl(JSON.parse(e.data)));
+    }
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Arabic Church Assistant — Google speech</title></head>
+<body style="font:14px system-ui,sans-serif;background:#111;color:#ccc;margin:16px">
+<p>Arabic Church Assistant's speech engine uses this page to pass the sound to Google's speech recognition in Chrome.
+It is opened and closed by Arabic Church Assistant.</p>
+<p id="st">Starting…</p>
+<script>
+'use strict';
+// Run by engine/live.py in a hidden (headless) Chrome that has a profile of its own.
+//   engine -> page   binary message: the sound as it is heard, 16 kHz mono 16-bit PCM
+//                    text message:   {"cmd": "listen", "on": true, "lang": "ar-EG", "langs": ["ar-EG", "en-US"]} | {"cmd": "cut"}
+//                                    | {"cmd": "once", "id": "...", "lang": "ar-EG", "pcm": "<base64 16-bit PCM>"}
+//   page -> engine   {"ev": "ready" | "partial" | "final" | "ended" | "once" | "error" | "hb" | "log", ...}
+// A recognizer hears one language. With two ("langs"), every session has one recognizer per language on the same sound;
+// their words come back marked with their language (and Google's confidence), and the engine keeps the one that makes sense.
+// On church audio Google never decides by itself that a sentence has ended: after the first one it keeps the session open
+// and sends nothing more. So the engine says "cut" at each pause: a new session starts listening at once, on the same
+// sound, and the old one is stopped (its text arrives as final). No word is lost in between.
+const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+const st = document.getElementById('st');
+let ws = null, ctx = null, player = null, track = null, audioError = '';
+let listening = false, lang = 'ar-EG', langs = ['ar-EG'], cur = null, sessions = 0, buffered = 0;
+let quickEnds = 0;      // sessions that ended at once (no internet, Google refusing): wait longer each time before the next
+const REFUSED = ['not-allowed', 'service-not-allowed', 'language-not-supported'];
+
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+
+// Plays the sound from the engine into a MediaStreamTrack for the recognizer. Keeps about 0.1 s in hand; when the two clocks
+// (the input device's and this one's) drift apart and more piles up, it drops 1 sample in 128 until it is back near 0.15 s.
+const WORKLET = `
+class Player extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.buf = new Float32Array(sampleRate * 10); this.r = 0; this.w = 0; this.n = 0; this.on = false; this.t = 0;
+    this.port.onmessage = e => {
+      const x = e.data;
+      if (x === 'flush') { this.r = this.w = this.n = 0; this.on = false; return; }
+      const L = this.buf.length;
+      for (let i = 0; i < x.length; i++) {
+        this.buf[this.w] = x[i]; this.w = (this.w + 1) % L;
+        if (this.n < L) this.n++; else this.r = (this.r + 1) % L;
+      }
+    };
+  }
+  process(inputs, outputs) {
+    const out = outputs[0][0], L = this.buf.length;
+    if (!this.on && this.n >= sampleRate / 10) this.on = true;
+    if (this.on) {
+      if (this.n > sampleRate * 0.15) { this.r = (this.r + 1) % L; this.n--; }
+      for (let i = 0; i < out.length; i++) {
+        if (this.n > 0) { out[i] = this.buf[this.r]; this.r = (this.r + 1) % L; this.n--; }
+        else { out[i] = 0; this.on = false; }
+      }
+    }
+    if (++this.t >= sampleRate / 128 / 4) { this.t = 0; this.port.postMessage(this.n); }
+    return true;
+  }
+}
+registerProcessor('player', Player);`;
+
+async function setupAudio() {
+  ctx = new AudioContext({ sampleRate: 16000, latencyHint: 'interactive' });
+  await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' })));
+  player = new AudioWorkletNode(ctx, 'player', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+  player.port.onmessage = e => { buffered = e.data; };
+  const dest = ctx.createMediaStreamDestination();
+  player.connect(dest);                       // not to the speakers: nothing is heard
+  track = dest.stream.getAudioTracks()[0];
+  if (ctx.state !== 'running') await ctx.resume().catch(() => {});
+}
+
+function joinText(list) { return list.map(x => x[0].transcript).join(' ').replace(/\s+/g, ' ').trim(); }
+
+class Session {
+  constructor() {
+    this.id = ++sessions; this.started = performance.now(); this.open = 0;
+    this.recs = [];
+    for (const l of langs) this.recs.push(this.listen(l));
+  }
+  // one recognizer of this session, for one language
+  listen(l) {
+    const x = { r: new R(), lang: l, interim: '', sent: '', done: false, refused: false };
+    const r = x.r;
+    r.lang = l; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = e => this.result(x, e);
+    r.onerror = e => {
+      if (REFUSED.includes(e.error)) x.refused = true;
+      if (e.error !== 'no-speech' && e.error !== 'aborted') send({ ev: 'error', error: e.error, message: e.message || '', lang: l });
+    };
+    r.onend = () => this.end(x);
+    this.open++;
+    r.start(track);
+    return x;
+  }
+  result(x, e) {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (!e.results[i].isFinal) continue;
+      const alt = e.results[i][0];
+      const text = (alt.transcript || '').trim() || x.interim;   // an empty final: keep what was heard so far
+      x.interim = '';
+      if (text) send({ ev: 'final', text, lang: x.lang, conf: alt.confidence || 0, session: this.id });
+    }
+    const interim = joinText(Array.from(e.results).filter(y => !y.isFinal));
+    if (interim) x.interim = interim;
+    if (cur === this && interim && interim !== x.sent) { x.sent = interim; send({ ev: 'partial', text: interim, lang: x.lang, session: this.id }); }
+  }
+  end(x) {
+    if (x.done) return;
+    x.done = true;
+    this.open--;
+    if (x.interim) send({ ev: 'final', text: x.interim, lang: x.lang, conf: 0, session: this.id, fromInterim: true });
+    x.interim = '';
+    send({ ev: 'ended', lang: x.lang, session: this.id, dur: Math.round(performance.now() - this.started) });
+    if (cur === this) {                       // it ended by itself: the session is over, and a new one listens
+      cur = null;
+      const quick = performance.now() - this.started < 1500;
+      quickEnds = quick ? quickEnds + 1 : 0;
+      const wait = x.refused ? 10000 : quick ? Math.min(8000, 250 * 2 ** Math.min(quickEnds, 5)) : 30;
+      if (listening) setTimeout(startSession, wait);
+      this.stop();                            // (the other language's recognizer too: what it heard comes back as final)
+    }
+  }
+  stop() { for (const x of this.recs) { try { x.r.stop(); } catch { /* already over */ } } }
+}
+
+function startSession() {
+  if (!listening || !track || cur) return;
+  try { cur = new Session(); }
+  catch (e) { cur = null; send({ ev: 'error', error: 'start', message: String((e && e.message) || e) }); setTimeout(startSession, 500); }
+}
+
+function cut() {
+  const old = cur;
+  if (!old || performance.now() - old.started < 1000) return;
+  cur = null;
+  startSession();                            // the new session is listening before the old one stops
+  old.stop();
+}
+
+function setListening(on) {
+  if (on === listening) { if (on && !cur) startSession(); return; }
+  listening = on;
+  if (on) { if (ctx) ctx.resume().catch(() => {}); startSession(); }
+  else {
+    const old = cur; cur = null;
+    if (old) old.stop();
+    if (player) player.port.postMessage('flush');
+  }
+}
+
+// A spoken command from the phone remote: a short recording, recognized on its own beside the live listening.
+function once(id, cmdLang, b64) {
+  let done = false, text = '', interim = '', error = '';
+  const finish = () => { if (done) return; done = true; clearTimeout(timer); send({ ev: 'once', id, text: (text || interim).trim(), error }); };
+  let timer = setTimeout(finish, 30000);
+  try {
+    const bin = atob(b64 || ''), n = bin.length >> 1, f = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let v = bin.charCodeAt(2 * i) | (bin.charCodeAt(2 * i + 1) << 8); if (v >= 32768) v -= 65536; f[i] = v / 32768; }
+    if (!n) { error = 'the recording was empty'; return finish(); }
+    const buf = ctx.createBuffer(1, n, ctx.sampleRate);
+    buf.copyToChannel(f, 0);
+    const src = ctx.createBufferSource(), dest = ctx.createMediaStreamDestination();
+    src.buffer = buf; src.connect(dest);
+    const r = new R();
+    r.lang = cmdLang || lang; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = e => { const all = Array.from(e.results); text = joinText(all.filter(x => x.isFinal)); const it = joinText(all.filter(x => !x.isFinal)); if (it) interim = it; };
+    r.onerror = e => { if (e.error !== 'no-speech' && e.error !== 'aborted') error = e.error; };
+    r.onend = finish;
+    r.onstart = () => src.start();
+    src.onended = () => setTimeout(() => { try { r.stop(); } catch { finish(); } }, 700);
+    clearTimeout(timer);
+    timer = setTimeout(() => { try { r.abort(); } catch { /* over */ } finish(); }, n / 16 + 8000);
+    r.start(dest.stream.getAudioTracks()[0]);
+  } catch (e) { error = String((e && e.message) || e); finish(); }
+}
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => {
+    st.textContent = 'Connected to Arabic Church Assistant.';
+    send({ ev: 'ready', ok: !!R && !!track, error: !R ? 'This browser has no speech recognition.' : audioError, ua: navigator.userAgent });
+  };
+  ws.onmessage = e => {
+    if (typeof e.data !== 'string') {
+      if (!player || !listening) return;
+      const s = new Int16Array(e.data), f = new Float32Array(s.length);
+      for (let i = 0; i < s.length; i++) f[i] = s[i] / 32768;
+      player.port.postMessage(f, [f.buffer]);
+      return;
+    }
+    let m; try { m = JSON.parse(e.data); } catch { return; }
+    if (m.cmd === 'listen') {                   // (the language of a spoken command from the phone is for that command only)
+      if (m.lang) lang = m.lang;
+      langs = Array.isArray(m.langs) && m.langs.length ? m.langs : [lang];
+      setListening(!!m.on);
+    }
+    // at once (the pause is still playing, so the new session is ready before the next word); only after a stall, when
+    // more than the usual 0.13 s is waiting to be played, by the extra
+    else if (m.cmd === 'cut') setTimeout(cut, Math.max(0, buffered / 16 - 130));
+    else if (m.cmd === 'once') once(m.id, m.lang, m.pcm);
+  };
+  ws.onclose = () => { st.textContent = 'Waiting for Arabic Church Assistant…'; setListening(false); setTimeout(connect, 1000); };
+}
+
+setInterval(() => send({ ev: 'hb', listening, session: cur ? cur.id : 0, sessions, buffered, audio: ctx ? ctx.state : 'none' }), 5000);
+setupAudio().catch(e => { audioError = 'Could not set up the sound: ' + ((e && e.message) || e); }).finally(connect);
+</script>
+</body>
+</html>
