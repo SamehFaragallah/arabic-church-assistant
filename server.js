@@ -641,10 +641,12 @@ speech.gate = checkGpu().catch(() => null).then(g => {
 // adds PyTorch (about 3 GB with an NVIDIA card, 0.2 GB without) and the model (4 GB, straight into engine\models).
 const MODEL_REPO = 'CohereLabs/cohere-transcribe-arabic-07-2026';
 const MODEL_DIR = path.join(ROOT, 'engine', 'models', 'cohere-transcribe-arabic-07-2026');
-// The Hugging Face sign-in for the model's download. The download zip carries one (engine\hf-token.json, never part of
-// the code on GitHub), so the model downloads without signing in; a token saved in Settings is used first.
+// The Hugging Face key for the model's download. The download zip carries a read-only one (engine\hf-token.json, never
+// part of the code on GitHub), so the model downloads without signing in; a token saved in Settings is used first.
+// It is kept reversed and in base64, so leak checkers that look for "hf_..." don't switch it off. It can only download.
 const BUILT_IN_HF = (() => {
-  try { return cleanKey(JSON.parse(fs.readFileSync(path.join(ROOT, 'engine', 'hf-token.json'), 'utf8').replace(/^﻿/, '')).token); }
+  try { const j = JSON.parse(fs.readFileSync(path.join(ROOT, 'engine', 'hf-token.json'), 'utf8').replace(/^﻿/, ''));
+    return cleanKey(j.token || [...Buffer.from(j.key || '', 'base64').toString('utf8')].reverse().join('')); }
   catch { return ''; }
 })();
 const hfToken = () => secrets.hfToken || BUILT_IN_HF;

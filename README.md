@@ -25,7 +25,7 @@ Speech is turned into text by **Google** (free, online, through a hidden Chrome)
 | **On this PC** (Cohere Transcribe Arabic) | about 7 GB more, the first time it is chosen (4.5 GB on a PC without an NVIDIA card) | about 8.5 GB more (4.6 GB without NVIDIA) | free, no internet while listening |
 | **Soniox** / **ElevenLabs** / **Deepgram** | nothing more | nothing more | paid, with the church's own key |
 
-The model for **On this PC** is downloaded only when that choice is picked; Google listens until it is ready, and Settings shows how far the download is. It needs an NVIDIA graphics card with 6 GB (or a fast processor). Its download page on Hugging Face asks for a free sign-in; when the app does not have one, Settings shows the three steps.
+The model for **On this PC** is downloaded only when that choice is picked; Google listens until it is ready, and Settings shows how far the download is. It needs an NVIDIA graphics card with 6 GB (or a fast processor). Its download page on Hugging Face asks for a sign-in. The download zip comes with a read-only key for it, so nobody has to sign in; without a working key (for example in a copy made from this code), Settings shows the three steps to use your own.
 
 Version 3 is a Windows desktop app. With **On this PC**, nothing goes to Google or anywhere else, there's no internet needed while listening, and it keeps listening for the whole service. Google's speech recognition is fixed so that it keeps listening for the whole service too.
 

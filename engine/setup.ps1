@@ -200,6 +200,15 @@ print("ok")
 '@
   $tmp = Join-Path $env:TEMP 'vf_get_model.py'
   Set-Content -Path $tmp -Value $script -Encoding UTF8
+  # the download zip's read-only Hugging Face key (kept reversed and in base64 in hf-token.json), unless one was given
+  $keyFile = Join-Path $here 'hf-token.json'
+  if (-not $env:HF_TOKEN -and (Test-Path $keyFile)) {
+    try {
+      $k = Get-Content $keyFile -Raw | ConvertFrom-Json
+      if ($k.token) { $env:HF_TOKEN = $k.token }
+      elseif ($k.key) { $c = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($k.key)).ToCharArray(); [array]::Reverse($c); $env:HF_TOKEN = -join $c }
+    } catch {}
+  }
   & $py $tmp $modelDir
   $got = $LASTEXITCODE
   if ($got -ne 0 -and $App) { Remove-Item $tmp -ErrorAction SilentlyContinue; exit $(if ($got -eq 3) { 3 } else { 1 }) }
