@@ -1103,13 +1103,15 @@
     const opts = [];
     const add = (v, t, disabled) => opts.push({ v, t, disabled });
     const defMic = (devices.mics || []).find(m => m.default);
-    add('mic:', 'Windows default microphone' + (defMic ? ` (${defMic.name})` : ''));
+    add('mic:', (devices.os === 'darwin' ? 'The Mac\'s default microphone' : 'Windows default microphone') + (defMic ? ` (${defMic.name})` : ''));
     for (const m of devices.mics || []) add('mic:' + m.name, '🎤 ' + m.name);
     if (settings.micName && !(devices.mics || []).some(m => m.name === settings.micName)) add('mic:' + settings.micName, '🎤 ' + settings.micName + ' (not connected)');
     add('-', '──────────', true);
-    const defSpk = (devices.speakers || []).find(s => s.default);
-    add('loop:', '🔊 This PC\'s sound (a video, YouTube, Zoom…)' + (defSpk ? ` — ${defSpk.name}` : ''));
-    for (const s of devices.speakers || []) if (!s.default) add('loop:' + s.name, '🔊 ' + s.name);
+    if (devices.loopback !== false) {          // (a Mac can't listen to its own sound without extra software)
+      const defSpk = (devices.speakers || []).find(s => s.default);
+      add('loop:', '🔊 This PC\'s sound (a video, YouTube, Zoom…)' + (defSpk ? ` — ${defSpk.name}` : ''));
+      for (const s of devices.speakers || []) if (!s.default) add('loop:' + s.name, '🔊 ' + s.name);
+    }
     add('file', '📁 Test with a recording or video…');
     let value;
     const f = speech.input && speech.input.kind === 'file' ? speech.file : null;

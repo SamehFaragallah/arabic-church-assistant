@@ -190,7 +190,7 @@
           <div class="inputs">
             <h4>MICROPHONES</h4>
             <div class="mics" id="mics"></div>
-            <h4>THIS PC'S SOUND — a video or YouTube playing here, Zoom, a stream</h4>
+            <h4 id="speakersTitle">THIS PC'S SOUND — a video or YouTube playing here, Zoom, a stream</h4>
             <div class="mics" id="speakers"></div>
           </div>
           <div class="note">Best results: feed the pastor's microphone from the sound desk straight into this PC, rather than a microphone in the room. To test with a recording, use <b>Listen to → 📁 Test with a recording</b> in the console.</div>
@@ -705,7 +705,10 @@
   function renderInputs() {
     const kind = s.inputKind || 'mic';
     const defMic = devices.mics.find(m => m.default), defSpk = devices.speakers.find(x => x.default);
-    const mics = [{ name: '', label: 'Windows default microphone' + (defMic ? ` (${defMic.name})` : '') }].concat(devices.mics.map(m => ({ name: m.name, label: m.name })));
+    const mac = devices.os === 'darwin';
+    const mics = [{ name: '', label: (mac ? 'The Mac\'s default microphone' : 'Windows default microphone') + (defMic ? ` (${defMic.name})` : '') }].concat(devices.mics.map(m => ({ name: m.name, label: m.name })));
+    // (a Mac can't listen to its own sound without extra software)
+    $('#speakersTitle').style.display = $('#speakers').style.display = devices.loopback === false ? 'none' : '';
     if (s.micName && !devices.mics.some(m => m.name === s.micName)) mics.push({ name: s.micName, label: s.micName + ' (not connected right now)' });
     const spk = [{ name: '', label: 'Everything this PC plays' + (defSpk ? ` (${defSpk.name})` : '') }].concat(devices.speakers.filter(x => !x.default).map(x => ({ name: x.name, label: x.name })));
     const draw = (box, items, k, key) => {
@@ -911,6 +914,12 @@
   // what "Automatic" picks on this PC, and why
   function renderHardware(h) {
     if (!h || !h.gpuChecked) return;
+    if (h.platform === 'darwin') {               // a Mac: no speech model on the computer (yet); Google or a paid service
+      const b = document.querySelector('#speechProvider [data-v="local"]');
+      if (b) b.style.display = 'none';
+      $('#autoNote').textContent = 'This Mac → Google' + (h.chrome ? '' : ' (Google needs Chrome, which isn\'t installed)');
+      return;
+    }
     const g = h.gpu;
     let s = 'This PC: ' + (g ? `${g.name} (${Math.round(g.memMB / 1024)} GB)` : 'no NVIDIA graphics card');
     if (g && !h.gpuGood) s += ', not suited to the model (it needs 6 GB)';

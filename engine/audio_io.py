@@ -4,12 +4,15 @@ Every input delivers 16 kHz mono float32 frames of 512 samples (32 ms) into a qu
 their own threads and never block the engine; the engine watches them and reopens one that stops."""
 import os
 import queue
+import sys
 import threading
 import time
 import warnings
 
 import numpy as np
 
+MAC = sys.platform == "darwin"   # (a Mac: Core Audio; its own sound can't be listened to without extra software)
+DEFAULT_MIC = "the Mac's default microphone" if MAC else "the Windows default microphone"
 RATE = 16000
 FRAME = 512                      # 32 ms: the frame size the voice detector (Silero VAD) works with
 
@@ -53,9 +56,9 @@ def list_devices():
         except Exception as e:
             err = str(e)
         try:
-            ds = _sc.default_speaker()
+            ds = None if MAC else _sc.default_speaker()
             dname = ds.name if ds else ""
-            for s in _sc.all_speakers():
+            for s in ([] if MAC else _sc.all_speakers()):
                 speakers.append({"name": s.name, "default": s.name == dname})
         except Exception as e:
             err = err or str(e)
@@ -69,7 +72,10 @@ def list_devices():
                     mics.append({"name": d["name"], "default": False})
         except Exception as e:
             err = err or str(e)
-    return {"mics": mics, "speakers": speakers, "error": err or _SC_ERROR}
+    out = {"mics": mics, "speakers": speakers, "error": err or _SC_ERROR}
+    if MAC:
+        out.update(loopback=False, os="darwin")
+    return out
 
 
 def _find(devs, name):
@@ -141,7 +147,7 @@ class LiveInput(Input):
         except Exception as e:                       # some microphones only open one way: try the other
             if _sc is None or self.stop_flag.is_set():
                 raise
-            self.emit({"ev": "log", "message": f"PortAudio could not open the microphone ({e}); trying WASAPI directly."})
+            self.emit({"ev": "log", "message": f"PortAudio could not open the microphone ({e}); trying {'Core Audio' if MAC else 'WASAPI'} directly."})
             return self._run_soundcard()
 
     def _run_soundcard(self):
@@ -168,7 +174,7 @@ class LiveInput(Input):
         apis = sd.query_hostapis()
         devs = sd.query_devices()
         name = self.name.strip()
-        order = ("Windows WASAPI", "MME", "Windows DirectSound")
+        order = ("Core Audio",) if MAC else ("Windows WASAPI", "MME", "Windows DirectSound")
         if name:
             for api in order:
                 for i, d in enumerate(devs):
@@ -176,13 +182,14 @@ class LiveInput(Input):
                         continue
                     if d["name"] == name or (len(d["name"]) >= 28 and name.startswith(d["name"])):
                         return i, api, d["name"]
-            self.emit({"ev": "warn", "message": f"The microphone “{name}” isn't connected. Using the Windows default microphone until it is back."})
+            self.emit({"ev": "warn", "message": f"The microphone “{name}” isn't connected. Using {DEFAULT_MIC} until it is back."})
             self.fallback = True
+        label = "The Mac's default microphone" if MAC else "Windows default microphone"
         try:
             i = sd.default.device[0]
-            return (i if i is not None and i >= 0 else None), "", "Windows default microphone"
+            return (i if i is not None and i >= 0 else None), "", label
         except Exception:
-            return None, "", "Windows default microphone"
+            return None, "", label
 
     def _run_portaudio(self):
         import sounddevice as sd

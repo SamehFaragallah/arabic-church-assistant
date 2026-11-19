@@ -2,7 +2,7 @@
   "name": "arabic-church-assistant",
   "productName": "Arabic Church Assistant",
   "version": "3.4.1",
-  "description": "Listens to an Arabic sermon and brings up Bible verses and hymn videos as they are mentioned. Windows desktop app.",
+  "description": "Listens to an Arabic sermon and brings up Bible verses and hymn videos as they are mentioned. Desktop app for Windows and Mac.",
   "author": "Sameh Welson Faragallah",
   "repository": "github:SamehFaragallah/arabic-church-assistant",
   "main": "electron/main.js",

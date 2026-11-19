@@ -15,7 +15,10 @@ const VERSION = '3.4.1';
 const PORT = parseInt(process.env.PORT || '5050', 10);
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
-// (VF_DATA_DIR: a data folder and settings.json of their own, for trying things out without touching the church's)
+// On a Mac there is no speech model on the computer yet (no NVIDIA cards): Google or a paid service listens.
+const IS_MAC = process.platform === 'darwin';
+// (VF_DATA_DIR: a data folder and settings.json of their own, for trying things out without touching the church's.
+// The Mac app sets it to ~/Library/Application Support/Arabic Church Assistant/data: it can't write inside itself.)
 const DATA = process.env.VF_DATA_DIR || path.join(ROOT, 'data');
 const FONT_DIR = path.join(DATA, 'fonts');
 const HISTORY_DIR = path.join(DATA, 'history');
@@ -330,7 +333,7 @@ function loadSettings() {
   try { raw = JSON.parse(txt.replace(/^﻿/, '')); } catch {
     if (txt.trim()) {
       raw = repairSettingsText(txt);
-      try { fs.writeFileSync(path.join(ROOT, 'settings.broken.json'), txt); } catch { /* ignore */ }
+      try { fs.writeFileSync(path.join(path.dirname(SETTINGS_FILE), 'settings.broken.json'), txt); } catch { /* ignore */ }
       log(raw ? '  settings.json had a small mistake in it. Repaired it (the original is kept as settings.broken.json).'
               : '  settings.json could not be read, so the default settings are used (the original is kept as settings.broken.json).');
     }
@@ -532,6 +535,13 @@ const hardware = { gpu: null, gpuGood: false, gpuChecked: false, chrome: '', loc
 const modelJob = { state: 'idle', step: '', error: '', startedAt: 0, proc: null, switchWhenIdle: false, timer: null };
 function findChrome() {
   const env = process.env;
+  if (IS_MAC) {
+    for (const dir of ['/Applications', path.join(os.homedir(), 'Applications')]) {
+      const exe = path.join(dir, 'Google Chrome.app', 'Contents', 'MacOS', 'Google Chrome');
+      if (fs.existsSync(exe)) return exe;
+    }
+    return '';
+  }
   for (const base of [env.ProgramFiles, env['ProgramFiles(x86)'], env.LOCALAPPDATA].filter(Boolean)) {
     const exe = path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe');
     if (fs.existsSync(exe)) return exe;
@@ -548,6 +558,7 @@ function findChrome() {
   return '';
 }
 function localModelReady() {
+  if (IS_MAC) return false;
   const eng = path.join(ROOT, 'engine');
   if (!fs.existsSync(path.join(enginePython(eng).packages, 'torch', '__init__.py'))) return false;   // the light install
   return modelFilesHere();
@@ -588,18 +599,18 @@ function checkGpu() {
 }
 // (while the model is being downloaded it is not ready, even when PyTorch and the model's file are already there)
 function refreshHardware() { hardware.chrome = findChrome(); hardware.localReady = modelJob.state !== 'running' && localModelReady(); hardware.torchGpu = torchUsesGpu(); }
-const autoProvider = () => (hardware.gpuGood && hardware.localReady && hardware.torchGpu ? 'local' : hardware.chrome ? 'google' : 'local');
-// "On this PC" before its model is ready: Google listens meanwhile (when Chrome is there)
+const autoProvider = () => (IS_MAC ? 'google' : hardware.gpuGood && hardware.localReady && hardware.torchGpu ? 'local' : hardware.chrome ? 'google' : 'local');
+// "On this PC" before its model is ready: Google listens meanwhile (when Chrome is there). On a Mac: Google.
 const speechProvider = () => {
   const p = settings.speechProvider === 'auto' ? autoProvider() : settings.speechProvider;
-  return p === 'local' && !hardware.localReady && hardware.chrome ? 'google' : p;
+  return p === 'local' && (IS_MAC || (!hardware.localReady && hardware.chrome)) ? 'google' : p;
 };
 function hardwareInfo() {
   refreshHardware();
   // Chrome installed or the model set up since: an automatic choice follows (not in the middle of listening)
   if (hardware.gpuChecked && settings.speechProvider === 'auto' && autoProvider() !== speech.config.provider && !speech.listening) applySpeechSettings();
   return { gpu: hardware.gpu, gpuGood: hardware.gpuGood, gpuChecked: hardware.gpuChecked, chrome: !!hardware.chrome,
-    localReady: hardware.localReady, torchGpu: hardware.torchGpu, auto: autoProvider(), provider: speechProvider() };
+    localReady: hardware.localReady, torchGpu: hardware.torchGpu, auto: autoProvider(), provider: speechProvider(), platform: process.platform };
 }
 const cloudKey = () => (PAID.includes(speechProvider()) ? secrets[speechProvider() + 'Key'] || '' : '');
 // words to listen out for (cloud services that take a hint list): the books of the Bible and the hymn titles
@@ -636,7 +647,8 @@ speech.gate = checkGpu().catch(() => null).then(g => {
   refreshHardware();
   const card = g ? `${g.name}, ${Math.round(g.memMB / 1024)} GB${!hardware.gpuGood ? ' (not suited to the speech model)'
     : !hardware.torchGpu ? ' (the speech engine was installed without graphics-card support: run Setup again)' : ''}` : 'no NVIDIA graphics card';
-  speech.addLog(`This PC: ${card}; speech model ${hardware.localReady ? 'installed' : 'not installed'}; Google Chrome ${hardware.chrome ? 'found' : 'not found'}.`);
+  if (IS_MAC) speech.addLog(`This Mac: Google Chrome ${hardware.chrome ? 'found' : 'not found'}.`);
+  else speech.addLog(`This PC: ${card}; speech model ${hardware.localReady ? 'installed' : 'not installed'}; Google Chrome ${hardware.chrome ? 'found' : 'not found'}.`);
   if (settings.speechProvider === 'auto') speech.addLog('Speech recognition: Automatic → ' + (autoProvider() === 'local' ? 'the model on this PC.' : 'Google, through Chrome.'));
   applySpeechSettings();
   if (settings.speechProvider === 'local' && !hardware.localReady) installModel('On this PC is chosen and its model is not here yet');
@@ -680,7 +692,7 @@ async function modelAccess() {
   } catch { return 'No internet connection.'; }
 }
 async function installModel(why) {
-  if (modelJob.state === 'running') return;
+  if (modelJob.state === 'running' || IS_MAC) return;
   refreshHardware();
   if (hardware.localReady) { modelChanged(); return; }
   Object.assign(modelJob, { state: 'running', step: 'Checking that the model can be downloaded…', error: '', startedAt: Date.now() });
@@ -1790,6 +1802,7 @@ const HTTPS_PORT = PORT + 393;   // 5443
 const CERT_FILE = path.join(DATA, 'remote-cert.pfx');
 let httpsServer = null;
 function startHttps() {
+  if (IS_MAC) return startHttpsMac();
   if (process.platform !== 'win32') return;
   const go = () => {
     try {
@@ -1808,6 +1821,32 @@ function startHttps() {
     if (err || !fs.existsSync(CERT_FILE)) return log('Could not make the phone remote certificate: ' + (err ? err.message : 'no file'));
     go();
   });
+}
+
+// On a Mac the certificate is made with the Mac's own openssl, as two files (the key and the certificate).
+const KEY_PEM = path.join(DATA, 'remote-key.pem'), CERT_PEM = path.join(DATA, 'remote-cert.pem');
+function startHttpsMac() {
+  const go = () => {
+    try {
+      httpsServer = require('https').createServer({ key: fs.readFileSync(KEY_PEM), cert: fs.readFileSync(CERT_PEM) }, (req, res) => server.emit('request', req, res));
+      httpsServer.on('error', e => log('Phone remote (https) not available: ' + e.message));
+      httpsServer.listen(HTTPS_PORT, '0.0.0.0');
+    } catch (e) { log('Phone remote (https) not available: ' + e.message); }
+  };
+  if (fs.existsSync(KEY_PEM) && fs.existsSync(CERT_PEM)) return go();
+  const san = ['DNS:localhost'].concat(lanAddresses().map(ip => 'IP:' + ip)).join(',');
+  const cnf = path.join(os.tmpdir(), `aca-remote-${process.pid}.cnf`);
+  try {
+    fs.mkdirSync(DATA, { recursive: true });
+    fs.writeFileSync(cnf, '[req]\ndistinguished_name = dn\nx509_extensions = ext\nprompt = no\n[dn]\nCN = Arabic Church Assistant\n' +
+      `[ext]\nsubjectAltName = ${san}\nbasicConstraints = CA:FALSE\nkeyUsage = digitalSignature, keyEncipherment\nextendedKeyUsage = serverAuth\n`);
+  } catch (e) { return log('Could not make the phone remote certificate: ' + e.message); }
+  execFile('/usr/bin/openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '3650', '-keyout', KEY_PEM, '-out', CERT_PEM, '-config', cnf],
+    { timeout: 30000 }, err => {
+      try { fs.unlinkSync(cnf); } catch { /* gone */ }
+      if (err || !fs.existsSync(CERT_PEM)) return log('Could not make the phone remote certificate: ' + (err ? err.message : 'no file'));
+      go();
+    });
 }
 
 function lanAddresses() {
@@ -1858,7 +1897,7 @@ function start() {
 function shutdown() { try { speech.stop(); } catch { /* ignore */ } stopModelInstall(); }
 process.on('exit', () => { if (speech.child) killTree(speech.child); if (modelJob.proc) killTree(modelJob.proc); });
 
-module.exports = { start, shutdown, hub, speech, getSettings: () => settings, getScreen: () => screen, VERSION, lanAddresses, ROOT, logLine };
+module.exports = { start, shutdown, hub, speech, getSettings: () => settings, getScreen: () => screen, VERSION, lanAddresses, ROOT, DATA, logLine };
 
 // On its own (without the desktop app): node server.js
 if (require.main === module) {
@@ -1871,7 +1910,7 @@ if (require.main === module) {
     const ips = lanAddresses();
     if (ips.length) log(`  From another PC  : http://${ips[0]}:${port}/display`);
     log('\n  The desktop app is the normal way to run Arabic Church Assistant: double-click "Arabic Church Assistant" on the desktop.\n');
-    if (process.argv.includes('--open')) exec(process.platform === 'win32' ? `start "" "${url}"` : `xdg-open "${url}"`);
+    if (process.argv.includes('--open')) exec(process.platform === 'win32' ? `start "" "${url}"` : `${IS_MAC ? 'open' : 'xdg-open'} "${url}"`);
   }).catch(e => { log('Could not start: ' + e.message); process.exit(1); });
   const bye = () => { shutdown(); setTimeout(() => process.exit(0), 300); };
   process.on('SIGINT', bye); process.on('SIGTERM', bye);

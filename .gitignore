@@ -13,10 +13,12 @@ data/usage.json
 data/videos.json
 data/phrases.json
 data/remote-cert.pfx
+data/remote-*.pem
 data/*.tmp
 
-# Downloaded or made by Setup.bat and the app
+# Downloaded or made by Setup.bat and the app (dist/: the Mac build, macos/build.sh)
 bin/
+dist/
 engine/python/
 engine/python.tmp/
 engine/.venv/

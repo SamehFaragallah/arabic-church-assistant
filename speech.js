@@ -12,11 +12,18 @@ const isWin = process.platform === 'win32';
 // Where the engine's Python is. Setup puts a Python of the app's own in engine\python (nothing has to be installed on
 // the PC, and the folder can be copied to another one). Installs from before that have a virtual environment in
 // engine\.venv instead, which is used when the other is not there. "home" is the folder with ready.txt in it.
+// (The Mac app carries its own Python in engine/python too: bin/python3, packages in lib/python3.x/site-packages.)
 function enginePython(dir) {
-  const own = path.join(dir, 'python', 'python.exe');
-  if (fs.existsSync(own) && fs.existsSync(path.join(dir, 'python', 'ready.txt'))) return { exe: own, home: path.join(dir, 'python'), packages: path.join(dir, 'python', 'Lib', 'site-packages') };
+  const home = path.join(dir, 'python');
+  const own = isWin ? path.join(home, 'python.exe') : path.join(home, 'bin', 'python3');
+  if (fs.existsSync(own) && fs.existsSync(path.join(home, 'ready.txt'))) return { exe: own, home, packages: sitePackages(home) };
   const venv = path.join(dir, '.venv');
-  return { exe: isWin ? path.join(venv, 'Scripts', 'python.exe') : path.join(venv, 'bin', 'python'), home: venv, packages: path.join(venv, 'Lib', 'site-packages') };
+  return { exe: isWin ? path.join(venv, 'Scripts', 'python.exe') : path.join(venv, 'bin', 'python'), home: venv, packages: sitePackages(venv) };
+}
+function sitePackages(home) {
+  if (isWin) return path.join(home, 'Lib', 'site-packages');
+  try { const v = fs.readdirSync(path.join(home, 'lib')).find(d => /^python3\.\d+$/.test(d)); if (v) return path.join(home, 'lib', v, 'site-packages'); } catch { /* not there */ }
+  return path.join(home, 'lib', 'site-packages');
 }
 
 // A venv's python.exe is a small launcher that starts the real Python as its own child, so stopping
@@ -99,8 +106,10 @@ class Speech extends EventEmitter {
       child = spawn(this.python, ['-u', '-s', 'engine.py', '--managed', '--device', this.config.device || 'auto', '--language', this.config.language || 'auto',
         '--provider', this.config.provider || 'local'], {
         cwd: this.dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'],
+        // (PYTHONDONTWRITEBYTECODE on a Mac: nothing may be written inside the app; its Python files come compiled)
         env: Object.assign({}, process.env, { PYTHONIOENCODING: 'utf-8', PYTHONUNBUFFERED: '1', PYTHONNOUSERSITE: '1', HF_HUB_OFFLINE: '1',
-          VF_STT_KEY: this.cloudKey || '', VF_CHROME: this.chrome || '', VF_GPU_RESTART_AT: String(Math.round(this.gpuRestartAt / 1000)) }),
+          VF_STT_KEY: this.cloudKey || '', VF_CHROME: this.chrome || '', VF_GPU_RESTART_AT: String(Math.round(this.gpuRestartAt / 1000)) },
+          isWin ? {} : { PYTHONDONTWRITEBYTECODE: '1' }),
       });
     } catch (e) { this.setState('error', 'Could not start the speech engine: ' + e.message); return; }
     this.child = child;
@@ -200,7 +209,8 @@ class Speech extends EventEmitter {
         if (st === 'ready' || st === 'listening') this.restarts = [];
         break;
       }
-      case 'devices': this.devices = { mics: ev.mics || [], speakers: ev.speakers || [] }; this.emit('devices', this.devices); break;
+      // (a Mac also says loopback: false, os: 'darwin')
+      case 'devices': this.devices = { mics: ev.mics || [], speakers: ev.speakers || [], loopback: ev.loopback, os: ev.os }; this.emit('devices', this.devices); break;
       case 'input':
         this.inputState = { kind: ev.kind, name: ev.name, ok: ev.ok, message: ev.message || '', silent: !!ev.silent };
         if (!ev.ok && ev.message) this.addLog('Input problem: ' + ev.message);

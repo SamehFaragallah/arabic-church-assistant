@@ -21,7 +21,9 @@ import json
 import re
 import os
 import shutil
+import signal
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -169,6 +171,9 @@ class Live:
 def find_chrome():
     """Google Chrome's chrome.exe: the app passes it in VF_CHROME; otherwise the usual places and the registry."""
     cands = [os.environ.get("VF_CHROME", "")]
+    if sys.platform == "darwin":
+        for base in ("/Applications", os.path.expanduser("~/Applications")):
+            cands.append(os.path.join(base, "Google Chrome.app", "Contents", "MacOS", "Google Chrome"))
     for base in (os.environ.get("ProgramFiles"), os.environ.get("ProgramFiles(x86)"), os.environ.get("LOCALAPPDATA")):
         if base:
             cands.append(os.path.join(base, "Google", "Chrome", "Application", "chrome.exe"))
@@ -194,6 +199,8 @@ class _Job:
 
     def __init__(self):
         self.h = None
+        if os.name != "nt":
+            return
         try:
             import ctypes
             from ctypes import wintypes
@@ -230,6 +237,11 @@ class _Job:
 
     def start(self, args):
         """Starts a program inside the job (suspended until it is in, so its first helper processes are in too)."""
+        if os.name != "nt":
+            # (a Mac has no job objects: a small watcher starts the program in a process group of its own, and ends that
+            # group, the program's helpers too, when this engine ends, however it ends. kill_tree ends the group.)
+            return subprocess.Popen([sys.executable, "-c", _WATCHER, str(os.getpid())] + list(args), stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, close_fds=True, start_new_session=True)
         flags = NO_WINDOW | (0x4 if self.h else 0)                   # 0x4: CREATE_SUSPENDED
         p = subprocess.Popen(args, creationflags=flags, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL, close_fds=True)
@@ -241,8 +253,34 @@ class _Job:
         return p
 
 
+_WATCHER = """
+import os, signal, subprocess, sys, time
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+engine = int(sys.argv[1])
+p = subprocess.Popen(sys.argv[2:], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+while p.poll() is None and os.getppid() == engine:
+    time.sleep(0.5)
+if p.poll() is None:
+    os.killpg(0, signal.SIGTERM)
+    for _ in range(20):
+        if p.poll() is not None:
+            break
+        time.sleep(0.25)
+    os.killpg(0, signal.SIGKILL)
+sys.exit(p.returncode if p.returncode and p.returncode > 0 else 0)
+"""
+
+
 def _pid_alive(pid):
     """Is that process still running? (Windows; os.kill(pid, 0) would end it there.)"""
+    if os.name != "nt":
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except OSError:
+            return True
+        return True
     try:
         import ctypes
         k32 = ctypes.WinDLL("kernel32", use_last_error=True)
@@ -262,6 +300,18 @@ def _pid_alive(pid):
 
 def kill_tree(p):
     if p is None or p.poll() is not None:
+        return
+    if os.name != "nt":                          # (the watcher's process group: Chrome and its helpers)
+        for sig, wait in ((signal.SIGTERM, 3.0), (signal.SIGKILL, 2.0)):
+            try:
+                os.killpg(p.pid, sig)
+            except OSError:
+                return
+            try:
+                p.wait(timeout=wait)
+                return
+            except subprocess.TimeoutExpired:
+                pass
         return
     try:
         subprocess.run(["taskkill", "/PID", str(p.pid), "/T", "/F"], creationflags=NO_WINDOW,
@@ -325,7 +375,7 @@ class GoogleSpeech(Live):
         self.port = self.server.socket.getsockname()[1]
         threading.Thread(target=self.server.serve_forever, daemon=True, name="google-page").start()
         threading.Thread(target=self._sender, daemon=True, name="google-send").start()
-        self.profiles = os.path.join(os.path.dirname(HERE), "data", "chrome-speech")
+        self.profiles = os.path.join(os.environ.get("VF_DATA_DIR") or os.path.join(os.path.dirname(HERE), "data"), "chrome-speech")
         self._clean_profiles(keep_mine=False)
         self._launch()
         threading.Thread(target=self._watch, daemon=True, name="google-watch").start()
@@ -367,6 +417,8 @@ class GoogleSpeech(Live):
                 "--disable-features=OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,"
                 "OptimizationHints,Translate,MediaRouter",
                 "--log-level=3", f"http://127.0.0.1:{self.port}/"]
+        if sys.platform == "darwin":                 # (no question about the Mac's keychain for a fresh profile)
+            args[1:1] = ["--use-mock-keychain"]
         self.launched_at = time.time()
         try:
             self.proc = self.job.start(args)

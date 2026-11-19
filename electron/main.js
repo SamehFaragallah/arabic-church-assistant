@@ -7,13 +7,29 @@ const fs = require('fs');
 
 const ROOT = path.join(__dirname, '..');
 const ICON = path.join(__dirname, 'icon.png');
+const MAC = process.platform === 'darwin';
 
-app.setAppUserModelId('ArabicChurchAssistant.Desktop');
+if (process.platform === 'win32') app.setAppUserModelId('ArabicChurchAssistant.Desktop');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 if (!app.requestSingleInstanceLock()) { app.quit(); process.exit(0); }
+
+// The Mac app can't write inside itself (Arabic Church Assistant.app): its settings, history, logs and recordings are in
+// ~/Library/Application Support/Arabic Church Assistant/data, which gets the Bibles, fonts and song list it comes with.
+if (MAC && app.isPackaged && !process.env.VF_DATA_DIR) {
+  const dir = path.join(app.getPath('userData'), 'data');
+  const seed = (from, to) => {
+    fs.mkdirSync(to, { recursive: true });
+    for (const e of fs.readdirSync(from, { withFileTypes: true })) {
+      const s = path.join(from, e.name), d = path.join(to, e.name);
+      if (e.isDirectory()) seed(s, d); else if (!fs.existsSync(d)) fs.copyFileSync(s, d);
+    }
+  };
+  try { seed(path.join(ROOT, 'data'), dir); } catch (e) { console.error('Could not set up ' + dir + ': ' + e.message); }
+  process.env.VF_DATA_DIR = dir;
+}
 
 const server = require(path.join(ROOT, 'server.js'));
 let base = 'http://localhost:5050';
@@ -172,7 +188,8 @@ ipcMain.handle('vf:pick-file', async () => {
 });
 ipcMain.handle('vf:open-external', (e, url) => { if (/^https:\/\//.test(String(url))) shell.openExternal(String(url)); return true; });
 ipcMain.handle('vf:open-folder', (e, which) => {
-  const dirs = { history: path.join(ROOT, 'data', 'history'), logs: path.join(ROOT, 'data', 'logs'), recordings: path.join(ROOT, 'data', 'recordings'),
+  const data = server.DATA || path.join(ROOT, 'data');
+  const dirs = { history: path.join(data, 'history'), logs: path.join(data, 'logs'), recordings: path.join(data, 'recordings'),
     app: ROOT, engine: path.join(ROOT, 'engine') };
   const d = dirs[which] || ROOT;
   fs.mkdirSync(d, { recursive: true });
@@ -208,9 +225,19 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
+  if (MAC) {
+    // a Mac's menu bar: copy and paste in the text boxes, Quit (⌘Q), full screen, the windows
+    Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' }]));
+    // the speech engine listens on behalf of the app: the Mac asks the operator once
+    const { systemPreferences } = require('electron');
+    const mic = systemPreferences.getMediaAccessStatus('microphone');
+    if (mic === 'not-determined') systemPreferences.askForMediaAccess('microphone').then(ok => note('Microphone: ' + (ok ? 'allowed.' : 'not allowed (System Settings → Privacy & Security → Microphone).'))).catch(() => {});
+    else if (mic !== 'granted') note(`Microphone access is ${mic}: allow Arabic Church Assistant in System Settings → Privacy & Security → Microphone.`);
+  }
   createConsole();
   setTimeout(fixFolderShortcut, 5000);
-  tray = new Tray(icon() || nativeImage.createEmpty());
+  const trayIcon = icon();
+  tray = new Tray(trayIcon && MAC ? trayIcon.resize({ width: 18, height: 18 }) : trayIcon || nativeImage.createEmpty());
   tray.on('click', () => { if (consoleWin) { consoleWin.show(); consoleWin.focus(); } });
   updateTray();
   if (server.getSettings().displayAutoOpen) setTimeout(openDisplay, 1500);
@@ -229,8 +256,8 @@ app.whenReady().then(async () => {
     updateTray();
   });
   server.hub.on('display', action => { if (action === 'close') closeDisplay(); else openDisplay(); });
-  powerMonitor.on('suspend', () => note('Windows is going to sleep.'));
-  powerMonitor.on('resume', () => note('Windows woke up.'));
+  powerMonitor.on('suspend', () => note(MAC ? 'The Mac is going to sleep.' : 'Windows is going to sleep.'));
+  powerMonitor.on('resume', () => note(MAC ? 'The Mac woke up.' : 'Windows woke up.'));
   server.hub.on('settings', (s, before) => { if (before && s.displayId !== before.displayId) placeDisplay(); });
 });
 
