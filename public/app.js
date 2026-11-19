@@ -117,7 +117,8 @@
     if (versions.length < BUILT_IN_EN.length && !loadEnglish.retried) { loadEnglish.retried = true; setTimeout(loadEnglish, 120000); }
   }
   async function loadDisplayEnglish() {
-    const v = BUILT_IN_EN.includes(settings.englishVersion) ? settings.englishVersion : 'bsb';
+    // (an online translation's stand-in for when it can't be reached: the KJV for the NKJV and its kin, else the BSB)
+    const v = BUILT_IN_EN.includes(settings.englishVersion) ? settings.englishVersion : /KJV/i.test(settings.apiBibleAbbr || '') && settings.englishVersion === 'apibible' ? 'kjv' : 'bsb';
     if (bibleEn && bibleEnVersion === v) return;
     let b = null;
     try { b = await fetchEnglish(v); } catch { /* fall back below */ }

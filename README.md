@@ -6,14 +6,18 @@ Arabic Church Assistant listens to the pastor preaching in Arabic or English. Wh
 
 ## Download
 
-1. Open the [latest release](https://github.com/SamehFaragallah/arabic-church-assistant/releases/latest) and download the `.zip` under **Assets**.
-2. Right-click the zip, choose **Extract All**, and put the folder where it can stay (for example in Documents).
-3. In the folder, double-click **`Setup.bat`** once. It puts an **Arabic Church Assistant** icon on the desktop and in the Start menu. (Or open the app straight away with `Arabic Church Assistant.bat`.)
-4. Windows may say *Windows protected your PC*, because the app is new and not signed: click **More info → Run anyway**. When it asks whether the app may use the network, click **Allow** (for the phone remote, OBS and displays on other PCs).
+The [latest release](https://github.com/SamehFaragallah/arabic-church-assistant/releases/latest) has two downloads under **Assets**. Both are the finished app, ready to run: nothing else has to be installed.
 
-It needs Windows 10 or 11 and **Google Chrome** (for Google speech, the default). Nothing else has to be installed: the app, its speech engine and the Bibles are all inside the folder.
+- **`Arabic-Church-Assistant-…-Windows.zip`** (about 240 MB): listens with Google (needs internet). The model that runs on the PC itself is downloaded later, only if **On this PC** is chosen in Settings.
+- **The offline edition** (about 7 GB, in parts, because GitHub takes files of up to 2 GB): everything, the speech model included, for a church without internet. Download every `…-Windows-Offline.zip.001`, `.002`, … part and the `…-Offline-Join.bat` into one folder, then double-click the `.bat`: it puts the parts together and unpacks the folder. It listens **On this PC** from the start: with an NVIDIA graphics card (6 GB or more) it keeps up with the pastor; without one it works, more slowly.
 
-The ESV and API.Bible translations (NKJV, NIV and many more) work straight away with the keys that come with the app. A church can use its own keys instead in **Settings → English on screen**.
+1. Right-click the zip, choose **Extract All**, and put the folder where it can stay (for example in Documents). (The offline edition's `.bat` does this for you.)
+2. In the folder, double-click **Arabic Church Assistant** (the shortcut at the top of the folder). To also have its icon on the desktop and in the Start menu, double-click **`Setup.bat`** once.
+3. Windows may say *Windows protected your PC*, because the app is new and not signed: click **More info → Run anyway**. When it asks whether the app may use the network, click **Allow** (for the phone remote, OBS and displays on other PCs).
+
+It needs Windows 10 or 11, and **Google Chrome** for Google speech (the offline edition doesn't need it). The app, its speech engine and the Bibles are all inside the folder.
+
+The English under the Arabic is the NKJV, from API.Bible, with the key that comes with the app (the ESV and many more can be chosen); without internet the KJV that is inside the app is shown instead. A church can use its own keys in **Settings → English on screen**.
 
 ## What it listens with, and how much space it takes
 
@@ -23,6 +27,7 @@ Speech is turned into text by **Google** (free, online, through a hidden Chrome)
 |---|---|---|---|
 | **Google** (the default) | the app's zip, about 240 MB | about 560 MB | free (needs internet) |
 | **On this PC** (Cohere Transcribe Arabic) | about 7 GB more, the first time it is chosen (4.5 GB on a PC without an NVIDIA card) | about 8.5 GB more (4.6 GB without NVIDIA) | free, no internet while listening |
+| **The offline edition** (On this PC from the start) | about 7 GB, in parts | about 9.3 GB | free, no internet at all |
 | **Soniox** / **ElevenLabs** / **Deepgram** | nothing more | nothing more | paid, with the church's own key |
 
 The model for **On this PC** is downloaded only when that choice is picked; Google listens until it is ready, and Settings shows how far the download is. It needs an NVIDIA graphics card with 6 GB (or a fast processor). Its download page on Hugging Face asks for a sign-in. The download zip comes with a read-only key for it, so nobody has to sign in; without a working key (for example in a copy made from this code), Settings shows the three steps to use your own.

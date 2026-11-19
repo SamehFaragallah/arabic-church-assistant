@@ -1458,6 +1458,9 @@
     // the one word, and nothing else: "Next." / «التالي» ("Next verse." after an Arabic verse is often written «التالي»)
     if (/^(?:التالي|التاليه|next|next one)$/.test(n)) return { dir: 'next', bare: true };
     if (/^(?:السابق|السابقه|previous|previous one)$/.test(n)) return { dir: 'prev', bare: true };
+    // what Google writes for "next verse" when it mishears it, as all that was said: "next word", "Nexus 1", «اكس بوكس», «نكسبر»
+    if (/^(?:the )?next (?:verses|words?|first|birth|purse|worse|nurse)$|^nexus(?: (?:1|one|1 st|first))?$/.test(n)
+      || /^(?:ال)?اكس بوكس$|^نكست(?: ?(?:فيرس|فرس|فيرز|بيرس))?$|^نكس ?(?:بر|فيرس|فرس|فيرز|بيرس)$|^نيكست(?: ?فيرس)?$/.test(n)) return { dir: 'next', bare: true };
     const b = detectBareNav(text);
     return b ? { dir: b.dir, bare: true } : null;
   }
@@ -2638,6 +2641,6 @@
   return {
     normalize, tokenize, parseNumber, findRefs, parseQuery, detectNav, detectNavDetail, refLabel, toArabicDigits, qtokens,
     stripTashkeel, enTokens, isEnglish, Bible, QuoteIndex, FuzzyQuoteIndex, verseSimilarity, alignWords, soft, Detector, Director, Phrases,
-    DEFAULT_PHRASES, isLongRef, langRuns, VideoMatcher, SongIndex, splitTitle, BOOKS, version: '3.4.0',
+    DEFAULT_PHRASES, isLongRef, langRuns, VideoMatcher, SongIndex, splitTitle, BOOKS, version: '3.4.1',
   };
 });

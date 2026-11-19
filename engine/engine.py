@@ -38,7 +38,7 @@ import numpy as np  # noqa: E402
 import audio_io  # noqa: E402
 from asr import Segmenter, Transcriber, VoiceDetector, find_model, latin_share, two_languages  # noqa: E402
 
-VERSION = "3.4.0"
+VERSION = "3.4.1"
 START = time.time()
 LIVE_NAMES = ("google", "elevenlabs", "soniox")   # services sent the sound as it is heard (live.py); the others get whole sentences
 

@@ -107,6 +107,11 @@ eq('nav prev msa', VE.detectNav('كما قرأنا في الآية السابق�
 eq('nav none', VE.detectNav('واللي بعده جه وقال'), null);
 eq('bare next: end of sentence', VE.detectNav('نقرا اللي بعده'), 'next');
 eq('bare next: and the next', VE.detectNav('واللي بعده'), 'next');
+eq('Google mishearing "next verse": Nexus 1', VE.detectNav('Nexus 1.'), 'next');
+eq('Google mishearing "next verse": next word', VE.detectNav('next word'), 'next');
+eq('Google mishearing "next verse": «اكس بوكس»', VE.detectNav('اكس بوكس'), 'next');
+eq('Google mishearing "next verse": «نكسبر»', VE.detectNav('نكسبر'), 'next');
+eq('not a command: "the next word is love"', VE.detectNav('the next word is love'), null);
 eq('bare next: feminine', VE.detectNav('طب اللي بعدها'), 'next');
 eq('bare next: goes on reading', VE.detectNav('اللي بعده بيقول لأن الله'), 'next');
 eq('bare next: with vocative', VE.detectNav('يلا اللي بعده يا جماعة'), 'next');

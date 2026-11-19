@@ -11,7 +11,7 @@ const EventEmitter = require('events');
 const { exec, execFile, execFileSync, spawn } = require('child_process');
 const { Speech, killTree, enginePython } = require('./speech');
 
-const VERSION = '3.4.0';
+const VERSION = '3.4.1';
 const PORT = parseInt(process.env.PORT || '5050', 10);
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
@@ -208,8 +208,8 @@ const DEFAULT_SETTINGS = {
                               // otherwise Google) | 'elevenlabs' | 'soniox' | 'deepgram' (paid)
   speechHints: true,          // the cloud services that take hints are told the Bible book names and hymn titles to expect
   // detection
-  autoShow: false,
-  autoShowQuotes: false,      // verses recognized from a quote (no reference said) go on screen by themselves too
+  autoShow: true,             // a reference said goes on screen without clicking Show
+  autoShowQuotes: false,     // verses recognized from a quote (no reference said) go on screen by themselves too
   quoteLive: true,            // … while they are still being said, once the quote is clear (off: when the sentence is finished)
   navFollow: true,            // "next verse" / "العدد اللي بعده" moves the screen when a verse is showing
   readAlong: true,            // the pastor reads on into the next verse: the screen follows
@@ -225,17 +225,17 @@ const DEFAULT_SETTINGS = {
   tashkeel: true,
   layout: 'full',
   background: 'dark',
-  showEnglish: false,
+  showEnglish: true,          // the English translation under the Arabic
   textSize: 1,
-  transition: 'rise',
+  transition: 'none',         // instant: no animation
   transitionMs: 450,
   showReference: true,        // the reference (يوحنا ٣: ١٦) above the verse
   displayId: '',              // which monitor the display opens on ('' = the projector / second screen)
   displayAutoOpen: true,      // open the display when the app starts
   // English
-  englishVersion: 'kjv',      // kjv | bsb | web | asv (built in) | esv | apibible (online, needs a key)
-  apiBibleId: '',
-  apiBibleAbbr: '',
+  englishVersion: 'apibible', // kjv | bsb | web | asv (built in) | esv | apibible (online, needs a key; the app has one)
+  apiBibleId: '63097d2a0a2f7db3-01',   // the NKJV (without internet the KJV is shown instead)
+  apiBibleAbbr: 'NKJV',
   englishForEnglish: true,    // verses found from English speech are shown with the English underneath
   // YouTube
   videoDetect: true,
@@ -320,7 +320,12 @@ function repairSettingsText(txt) {
 }
 function loadSettings() {
   let txt;
-  try { txt = fs.readFileSync(SETTINGS_FILE, 'utf8'); } catch { return Object.assign({}, DEFAULT_SETTINGS, { remotePin: newPin() }); }
+  try { txt = fs.readFileSync(SETTINGS_FILE, 'utf8'); } catch {
+    // a new install. The offline download carries the speech model, and without internet Google can't listen: listen on this PC
+    const fresh = { remotePin: newPin() };
+    if (fs.existsSync(path.join(ROOT, 'engine', 'models', 'cohere-transcribe-arabic-07-2026', 'model.safetensors'))) fresh.speechProvider = 'local';
+    return Object.assign({}, DEFAULT_SETTINGS, fresh);
+  }
   let raw = null;
   try { raw = JSON.parse(txt.replace(/^﻿/, '')); } catch {
     if (txt.trim()) {

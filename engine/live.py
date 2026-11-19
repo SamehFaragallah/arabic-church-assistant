@@ -33,6 +33,7 @@ from audio_io import FRAME, RATE
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FRAME_S = FRAME / RATE
+DEBUG = os.environ.get("VF_GOOGLE_DEBUG") == "1"         # (log each sentence's two Google texts and the one kept)
 NO_WINDOW = 0x08000000                       # CREATE_NO_WINDOW
 
 
@@ -60,12 +61,14 @@ class Cutter:
         self.configure(sensitivity=sensitivity)
         self.reset()
 
-    def configure(self, sensitivity=None, pause=None):
+    def configure(self, sensitivity=None, pause=None, min_len=None):
         if sensitivity is not None:
             s = min(0.9, max(0.1, float(sensitivity)))
             self.cont_p = max(0.15, (1.0 - s) - 0.15)       # as asr.Segmenter: speech goes on while above this
         if pause is not None:
             self.pause_f = max(3, int(round(float(pause) / FRAME_S)))
+        if min_len is not None:
+            self.min_f = int(float(min_len) / FRAME_S)
 
     def reset(self):
         self.age = 0          # frames since the first speech after the last cut
@@ -314,6 +317,9 @@ class GoogleSpeech(Live):
         self.part_lang = "ar"                   # the language the words still being said are shown in
         self.last_lang = "ar"                   # the language of the last sentence passed on
         self.on_cands = None                    # (tests) every sentence's two texts and which one was kept
+        self.decided = {}                       # session -> (language passed on "ar"/"en", Arabic text, English text)
+        self.said_in = []                       # the languages of the last ten sentences (an interpreter at work?)
+        self.interp = False
         self.job = _Job()
         self.server = serve(self._handler, "127.0.0.1", 0, process_request=self._http, compression=None, max_size=2 ** 23)
         self.port = self.server.socket.getsockname()[1]
@@ -461,15 +467,23 @@ class GoogleSpeech(Live):
         elif ev == "final":
             self.failing_since = 0.0
             if two:
-                c = self._cand(m.get("session"))
+                sid = m.get("session")
+                if sid in self.decided:
+                    self._late(sid, m["lang"], m.get("text", ""))
+                    return
+                c = self._cand(sid)
                 c["texts"].setdefault(m["lang"], []).append(m.get("text", ""))
+                c["alts"].setdefault(m["lang"], []).extend(m.get("alts") or [])
                 c["conf"][m["lang"]] = max(c["conf"].get(m["lang"], 0.0), float(m.get("conf") or 0.0))
             else:
                 ms = int((time.time() - self.last_cut_at) * 1000) if time.time() - self.last_cut_at < 8 else None
                 self.final(m.get("text", ""), ms=ms)
         elif ev == "ended":
             if two:
+                if m.get("session") in self.decided:
+                    return
                 c = self._cand(m.get("session"))
+                c.setdefault("ended_at", time.time())
                 c["ended"].add(m["lang"])
                 c["dur"] = max(c.get("dur", 0.0), float(m.get("dur") or 0) / 1000.0)
                 if c["ended"] >= set(self.sent_langs):
@@ -513,7 +527,7 @@ class GoogleSpeech(Live):
     def _cand(self, sid):
         c = self.cands.get(sid)
         if c is None:
-            c = self.cands[sid] = {"texts": {}, "conf": {}, "ended": set(), "t": time.time()}
+            c = self.cands[sid] = {"texts": {}, "alts": {}, "conf": {}, "ended": set(), "t": time.time()}
         return c
 
     def _dual_partial(self, sid, lang, text):
@@ -533,17 +547,68 @@ class GoogleSpeech(Live):
         ar, en = " ".join(c["texts"].get("ar-EG", [])).strip(), " ".join(c["texts"].get("en-US", [])).strip()
         ca, ce = c["conf"].get("ar-EG", 0.0), c["conf"].get("en-US", 0.0)
         lang = pick_language(ar, ca, en, ce, dur=c.get("dur", 0.0))
+        text = en if lang == "en" else ar
+        if text and not is_command(text) and len(text.split()) <= 3:
+            # a few words that aren't a command, when the other language's text or one of Google's other guesses is one:
+            # it was the command, misheard
+            for alt in [en, ar] + c["alts"].get("en-US", []) + c["alts"].get("ar-EG", []):
+                if alt and is_command(alt):
+                    text, lang = alt, ("en" if latin_share(alt) > 0.5 else "ar")
+                    break
+        if DEBUG:
+            self.log(f"Google #{sid}: ar «{ar}» {ca:.2f} | en \"{en}\" {ce:.2f} | alts {c['alts']} | ended {sorted(c['ended'])} -> {lang}")
+        self.decided[sid] = (lang, ar, en)
+        while len(self.decided) > 50:
+            self.decided.pop(next(iter(self.decided)))
+        self._note_language(text, lang)
         if self.on_cands:
             self.on_cands({"session": sid, "ar": ar, "ar_conf": ca, "en": en, "en_conf": ce, "dur": c.get("dur", 0.0), "pick": lang, "t": time.time()})
         ms = int((time.time() - self.last_cut_at) * 1000) if time.time() - self.last_cut_at < 8 else None
-        if (en if lang == "en" else ar):
+        if text:
             self.last_lang = lang
-        self.final(en if lang == "en" else ar, ms=ms)
+        self.final(text, ms=ms)
+
+    def _late(self, sid, lang, text):
+        """Words of a sentence that was already passed on (one recognizer took more than 3 s to finish after the other).
+        In the language that was kept, they go straight on. In the other language they are passed on too if they are
+        the better text (Psalm 5:9 read in Arabic and then in English: the Arabic two words had gone on, and the English
+        verse came after); otherwise they are dropped."""
+        kept, ar, en = self.decided[sid]
+        if not text:
+            return
+        if lang[:2] == kept:
+            self.final(text)
+            return
+        ar2, en2 = (ar + " " + text, en) if lang == "ar-EG" else (ar, en + " " + text)
+        if pick_language(ar2.strip(), 0.0, en2.strip(), 0.0) == lang[:2]:
+            self.decided[sid] = (lang[:2], ar2, en2)
+            self.final(text)
+        elif DEBUG:
+            self.log(f"Google #{sid}: late {lang} words dropped: {text}")
+
+    def _note_language(self, text, lang):
+        """An interpreter (English and Arabic by turns): as in the engine, of the last ten sentences the language changed
+        three times or more; over when ten in a row were in one language. Then a sentence may be cut after 1.5 s instead
+        of 4, so that the pastor's words and the interpreter's fall into sentences of their own and both are kept."""
+        if len(text) < 8:
+            return
+        self.said_in = (self.said_in + [lang])[-10:]
+        h = self.said_in
+        changes = sum(1 for a, b in zip(h, h[1:]) if a != b)
+        on = changes >= 3 if not self.interp else not (len(h) >= 10 and changes == 0)
+        if on != self.interp:
+            self.interp = on
+            self.cutter.configure(min_len=1.5 if on else 4.0)
+            self.log("English and Arabic by turns: an interpreter is at work. Sentences are now cut at shorter pauses."
+                     if on else "One language again: sentences are cut as usual.")
 
     def tick(self, now):
         super().tick(now)
-        for sid, c in list(self.cands.items()):       # a recognizer that never said it had finished: decide without it
-            if now - c["t"] > 6.0 and (c["ended"] or now - c["t"] > 25.0):
+        for sid, c in list(self.cands.items()):
+            # one recognizer finished 3 s ago and the other hasn't (the page ends them 2 s after a cut): decide without it.
+            # (Counted from its end, not from the first words: an Arabic phrase at the start of a long English sentence
+            # would otherwise cut the English off.)
+            if (c["ended"] and now - c.get("ended_at", c["t"]) > 3.0) or now - c["t"] > 30.0:
                 self._decide(sid)
 
     # ---- to the page
@@ -659,11 +724,18 @@ _COMMANDS = {"next", "next verse", "the next verse", "next one", "previous", "pr
              "العدد التالي", "الايه التاليه", "العدد السابق", "الايه السابقه"}
 
 
+# What Google writes for "next verse" when it mishears it, as all that was said (heard on 2026-11-18): "next word",
+# "Nexus 1", and from its Arabic recognizer «اكس بوكس», «نكسبر»
+_MISHEARD_NEXT = re.compile(r"(?:the )?next (?:verses|words?|first|birth|purse|worse|nurse)|nexus(?: (?:1|one|1st|first))?|"
+                            r"(?:ال)?اكس بوكس|نكست(?: ?(?:فيرس|فرس|فيرز|بيرس))?|نكس ?(?:بر|فيرس|فرس|فيرز|بيرس)|نيكست(?: ?فيرس)?")
+
+
 def is_command(text):
     """Is this all that was said a spoken command to move the screen ("Next.", «اللي بعده»)?"""
     t = re.sub(r"[\u064B-\u0652\u0640]", "", (text or "").lower())
     t = t.replace("ة", "ه").replace("ى", "ي").replace("أ", "ا").replace("إ", "ا").replace("آ", "ا")
-    return " ".join(re.sub(r"[^\w\s]", " ", t).split()) in _COMMANDS
+    t = " ".join(re.sub(r"[^\w\s]", " ", t).split())
+    return t in _COMMANDS or bool(_MISHEARD_NEXT.fullmatch(t))      # (or Google's way of mishearing "next verse")
 
 
 def _said_ar(t):
@@ -692,7 +764,8 @@ def pick_language(ar, ar_conf, en, en_conf, dur=0.0):
         return "en"
     said = " ".join(re.sub(r"[^a-z0-9]+", " ", en.lower()).split())
     # (the Arabic recognizer makes a word or two of it: «جواب» for "next", «الاكس بوكس» for "next verse")
-    if a < max(12.0, 2.0 * e) and (said in _EN_COMMANDS or re.fullmatch(r"(?:verse|chapter) \d+(?: verse \d+)?", said)):
+    if a < max(12.0, 2.0 * e) and (said in _EN_COMMANDS or _MISHEARD_NEXT.fullmatch(said)
+                                   or re.fullmatch(r"(?:verse|chapter) \d+(?: verse \d+)?", said)):
         return "en"
     if _EN_REF.search(en) and len(_NUMBER.findall(ar)) < 2:     # a whole reference in English, not in the Arabic
         return "en"

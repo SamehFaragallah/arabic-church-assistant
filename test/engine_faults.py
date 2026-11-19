@@ -588,6 +588,7 @@ def t_google():
                ("", 0.0, "now this is what the Lord Almighty says give careful thought to your ways", 0.94),
                ("جواب", 0.86, "next", 0.96),
                ("الاكس بوكس", 0.0, "next verse", 0.9),
+               ("اكس بوكس", 0.0, "Nexus 1", 0.8),            # (2026-11-18: both misheard "next verse")
                ("الاقصر", 0.59, "so that it looks like if we can get Google Voice working", 0.95),
                ("\u200flet's", 0.0, "let's read together John 1:5", 0.93),
                ("بس شويه جون 1", 0.0, "let's read John 1:5 together", 0.96)]
@@ -598,6 +599,9 @@ def t_google():
     check("a spoken command is known, in either language, and nothing more than that",
           all(live.is_command(x) for x in ("Next.", "next verse", "The next verse.", "التالي", "اللي بعديها.", "العدد اللي بعده"))
           and not any(live.is_command(x) for x in ("next we will read", "اللي بعده جه", "Next Sunday", "")))
+    check("Google's ways of mishearing \"next verse\" count as it, and only when they are all that was said",
+          all(live.is_command(x) for x in ("Nexus 1", "next word", "اكس بوكس", "نكسبر", "الاكس بوكس"))
+          and not any(live.is_command(x) for x in ("the next word is love", "nexus of the problem", "نكس العلم")))
     c = live.Cutter(min_len=4.0, pause=0.3)
     for _ in range(20):
         c.feed(0.9)

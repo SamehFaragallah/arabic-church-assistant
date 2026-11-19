@@ -73,7 +73,7 @@ function joinText(list) { return list.map(x => x[0].transcript).join(' ').replac
 
 class Session {
   constructor() {
-    this.id = ++sessions; this.started = performance.now(); this.open = 0;
+    this.id = ++sessions; this.started = performance.now(); this.open = 0; this.stopping = false;
     this.recs = [];
     for (const l of langs) this.recs.push(this.listen(l));
   }
@@ -81,7 +81,7 @@ class Session {
   listen(l) {
     const x = { r: new R(), lang: l, interim: '', sent: '', done: false, refused: false };
     const r = x.r;
-    r.lang = l; r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.lang = l; r.continuous = true; r.interimResults = true; r.maxAlternatives = 3;
     r.onresult = e => this.result(x, e);
     r.onerror = e => {
       if (REFUSED.includes(e.error)) x.refused = true;
@@ -93,16 +93,22 @@ class Session {
     return x;
   }
   result(x, e) {
+    if (x.done) return;                       // (it was ended early, below: what it had heard was sent then)
     for (let i = e.resultIndex; i < e.results.length; i++) {
       if (!e.results[i].isFinal) continue;
       const alt = e.results[i][0];
       const text = (alt.transcript || '').trim() || x.interim;   // an empty final: keep what was heard so far
+      // Google's other guesses: when it mishears "next verse" ("Nexus 1"), one of them is often right
+      const alts = Array.from(e.results[i]).slice(1).map(a => (a.transcript || '').trim()).filter(Boolean);
       x.interim = '';
-      if (text) send({ ev: 'final', text, lang: x.lang, conf: alt.confidence || 0, session: this.id });
+      if (text) send({ ev: 'final', text, alts, lang: x.lang, conf: alt.confidence || 0, session: this.id });
     }
     const interim = joinText(Array.from(e.results).filter(y => !y.isFinal));
     if (interim) x.interim = interim;
     if (cur === this && interim && interim !== x.sent) { x.sent = interim; send({ ev: 'partial', text: interim, lang: x.lang, session: this.id }); }
+    // A stopped session: once its last words are final, this recognizer is done. Chrome's own "end" can come 6 s later,
+    // and the engine waits for both languages to end before it passes the sentence on.
+    if (this.stopping && !interim) this.end(x);
   }
   end(x) {
     if (x.done) return;
@@ -120,7 +126,13 @@ class Session {
       this.stop();                            // (the other language's recognizer too: what it heard comes back as final)
     }
   }
-  stop() { for (const x of this.recs) { try { x.r.stop(); } catch { /* already over */ } } }
+  stop() {
+    this.stopping = true;
+    for (const x of this.recs) {
+      try { x.r.stop(); } catch { /* already over */ }
+      setTimeout(() => this.end(x), 2000);    // one with nothing more to say may not answer the stop for seconds
+    }
+  }
 }
 
 function startSession() {

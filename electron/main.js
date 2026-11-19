@@ -182,6 +182,19 @@ ipcMain.handle('vf:open-folder', (e, which) => {
 ipcMain.handle('vf:info', () => ({ version: server.VERSION, electron: process.versions.electron, root: ROOT }));
 
 // ------------------------------------------------------------------ start
+// The shortcut in the app's folder (it comes in the download) leads into bin\ by a path relative to itself, so it works
+// wherever the folder is unzipped; but until it also holds the full path, Windows shows it without the app's icon. Made
+// again once for each place the folder is in (electron\shortcut.ps1 keeps the relative path too).
+function fixFolderShortcut() {
+  const exe = process.execPath, lnk = path.join(ROOT, 'Arabic Church Assistant.lnk'), mark = path.join(ROOT, 'bin', 'shortcut.txt');
+  if (process.platform !== 'win32' || !/Arabic Church Assistant\.exe$/i.test(exe)) return;
+  try { if (!fs.existsSync(lnk) || fs.readFileSync(mark, 'utf8') === exe) return; } catch { /* not made here yet */ }
+  require('child_process').execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File',
+    path.join(__dirname, 'shortcut.ps1'), '-Link', lnk, '-Target', exe, '-Icon', path.join(__dirname, 'icon.ico')], { windowsHide: true }, err => {
+    if (!err) { try { fs.writeFileSync(mark, exe); } catch { /* next time */ } }
+  });
+}
+
 app.whenReady().then(async () => {
   // the pages are this app's own (localhost): allow the microphone, full screen and autoplay without asking
   const ok = url => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(url || '');
@@ -196,6 +209,7 @@ app.whenReady().then(async () => {
     return;
   }
   createConsole();
+  setTimeout(fixFolderShortcut, 5000);
   tray = new Tray(icon() || nativeImage.createEmpty());
   tray.on('click', () => { if (consoleWin) { consoleWin.show(); consoleWin.focus(); } });
   updateTray();
