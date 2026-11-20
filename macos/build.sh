@@ -3,7 +3,7 @@
 # paid services), the Bibles and the fonts, zipped into dist/. Run it on a Mac, in Terminal, from the app's folder:
 #
 #   bash macos/build.sh arm64     Macs with an Apple chip (M1 and newer), macOS 14 or newer
-#   bash macos/build.sh x64       Macs with an Intel processor, macOS 13 or newer (on an Apple-chip Mac: needs Rosetta)
+#   bash macos/build.sh x64       Macs with an Intel processor, macOS 13.4 or newer (on an Apple-chip Mac: needs Rosetta)
 #
 # Signed with your Apple Developer ID and notarized by Apple (opens on any Mac without warnings):
 #   MAC_SIGN_ID="Developer ID Application: Your Name (TEAMID)" MAC_NOTARY_PROFILE=ACA bash macos/build.sh arm64
@@ -20,7 +20,8 @@ PBS="https://github.com/astral-sh/python-build-standalone/releases/download/2026
 SIGN="${MAC_SIGN_ID:--}"
 
 # The newest packages made for each kind of Mac. (onnxruntime, for the voice detector, stopped making them for Intel
-# Macs after 1.23, and only for Python 3.13 and older.)
+# Macs after 1.23, and only for Python 3.13 and older. Its Intel library is built for macOS 13.4, so that is the oldest
+# macOS the Intel app opens on.)
 if [ "$ARCH" = arm64 ]; then
   LABEL=AppleSilicon; MIN_MACOS=14.0; PLATFORM=macosx_14_0_arm64; PV=3.14
   PY_FILE=cpython-3.14.10+20261110-aarch64-apple-darwin-install_only_stripped.tar.gz
@@ -28,7 +29,7 @@ if [ "$ARCH" = arm64 ]; then
   E_SHA=25ae0ce40ee462433c1029b8fcc485949fc8a89394b62b70887d7793898edc89
   PACKAGES="numpy==2.5.5 onnxruntime==1.32.0 av==19.0.2 sounddevice==0.5.6 soundcard==0.4.6 websockets==17.4"
 elif [ "$ARCH" = x64 ]; then
-  LABEL=Intel; MIN_MACOS=13.0; PLATFORM=macosx_13_0_x86_64; PV=3.13
+  LABEL=Intel; MIN_MACOS=13.4; PLATFORM=macosx_13_0_x86_64; PV=3.13
   PY_FILE=cpython-3.13.18+20261110-x86_64-apple-darwin-install_only_stripped.tar.gz
   PY_SHA=d27d59a722db9f69926eb6d9564071247221f45a04da920ea7f3001c97e32f9b
   E_SHA=151d249b646eb8b99f1bea40aff217b10d8e21246ad8c07bb3a5982e2722660f

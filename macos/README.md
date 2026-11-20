@@ -12,7 +12,7 @@ code is the same as the Windows version's; only what is around it differs (a Mac
 - Not on a Mac yet: **On this PC** (the speech model on the computer needs an NVIDIA graphics card), and listening to
   the Mac's own sound (a Mac can't without extra software).
 
-It needs macOS 14 or newer on a Mac with an Apple chip (M1 and newer), or macOS 13 or newer on an Intel Mac.
+It needs macOS 14 or newer on a Mac with an Apple chip (M1 and newer), or macOS 13.4 or newer on an Intel Mac.
 Settings, history, logs and recordings are kept in `~/Library/Application Support/Arabic Church Assistant/data`.
 
 ## Build it (on a Mac, about 10 minutes, with internet)

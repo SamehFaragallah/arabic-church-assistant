@@ -17,7 +17,7 @@ The [latest release](https://github.com/SamehFaragallah/arabic-church-assistant/
 
 It needs Windows 10 or 11, and **Google Chrome** for Google speech (the offline edition doesn't need it). The app, its speech engine and the Bibles are all inside the folder.
 
-**On a Mac:** the Mac version is a release of its own, with only the Mac's files in it (Google or a paid service listens; **On this PC** is for Windows PCs with an NVIDIA card). How it is built and signed: [macos/README.md](macos/README.md).
+**On a Mac:** the Mac version is a release of its own, with only the Mac's files in it: **[Arabic Church Assistant 3.4.1 for Mac](https://github.com/SamehFaragallah/arabic-church-assistant/releases/tag/v3.4.1-mac)** (macOS 14 or newer on an Apple chip, 13.4 or newer on an Intel Mac). Google or a paid service listens; **On this PC** is for Windows PCs with an NVIDIA card. How it is built and signed: [macos/README.md](macos/README.md).
 
 The English under the Arabic is the NKJV, from API.Bible, with the key that comes with the app (the ESV and many more can be chosen); without internet the KJV that is inside the app is shown instead. A church can use its own keys in **Settings → English on screen**.
 
