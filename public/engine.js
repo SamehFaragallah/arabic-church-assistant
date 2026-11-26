@@ -568,6 +568,14 @@
       const r = { chapter: 1, verse: n.value, verseEnd: null, end: n.end };
       takeRange(t, r);
       return r;
+    } else if (V_KW.has(t[j])) {
+      // «يوحنا الآية 3:16», "John verse 3:16": the verse word said loosely before chapter and verse (both numbers needed;
+      // else «الآية 3» was taken as verse 3 of the chapter on the screen)
+      const a = parseNumber(t, skip(t, j + 1, FILLER, 1)), b = a && parseNumber(t, a.end);
+      if (!b) return null;
+      const r = { chapter: a.value, verse: b.value, verseEnd: null, end: b.end };
+      takeRange(t, r);
+      return r;
     }
     const n1 = parseNumber(t, j);
     if (!n1) return null;
@@ -1462,6 +1470,9 @@
     if (/^(?:the )?next (?:verses|words?|first|birth|purse|worse|nurse)$|^nexus(?: (?:1|one|1 st|first))?$/.test(n)
       || /^(?:ال)?اكس بوكس$|^نكست(?: ?(?:فيرس|فرس|فيرز|بيرس))?$|^نكس ?(?:بر|فيرس|فرس|فيرز|بيرس)$|^نيكست(?: ?فيرس)?$/.test(n)) return { dir: 'next', bare: true };
     const b = detectBareNav(text);
+    // «واللي بعدها؟» as a question is asked of the people listening (what comes next in a list, who reads on), not of
+    // the screen; a reading that goes on is followed anyway
+    if (b && /(?:[وفب]?ال{1,2}[يى]|و?لل[يى])\s+(?:بعد|قبل)(?:ه|ها|يه|يها)\s*[؟?]/.test(text)) return null;
     return b ? { dir: b.dir, bare: true } : null;
   }
   function detectNav(text) {
@@ -1526,6 +1537,8 @@
     if (tokEq(a, b)) return 1;
     // «رب» / «ربي», «قلب» / «قلبي»: the "my" at the end comes and goes when a title is said, and when it is heard
     if ((a === b + 'ي' || b === a + 'ي') && Math.min(a.length, b.length) >= 2) return 0.8;
+    // «لهم» for «الهم»: the article's alef swallowed, as Soniox wrote it (26 Nov)
+    if ((b === 'ا' + a || a === 'ا' + b) && /^ال/.test(a.length > b.length ? a : b) && Math.min(a.length, b.length) >= 3) return 0.8;
     const x = skel(a), y = skel(b);
     if (x.length < 3 || y.length < 3) return 0;
     if (x === y) return 0.8;
@@ -1601,8 +1614,16 @@
   const HYMN_SKEL = skel('ترنيمه');
   const isHymnNoun = w => {
     const k = stripAl(w), k2 = k.replace(/^[بفل](?=...)/, '');
-    return SING_NOUN.has(k) || SING_NOUN.has(k2) || (/^[ء-ي]{5,}$/.test(k) && (skel(k) === HYMN_SKEL || skel(k2) === HYMN_SKEL));       // ("ترنيمي" for «ترنيمة»)
+    // («ترنيمت على ضرب الأوتار»: the ة said as ت before the name that follows it, and written so)
+    const k3 = /^[ء-ي]{4,}ت$/.test(k2) ? k2.slice(0, -1) + 'ه' : '';
+    return SING_NOUN.has(k) || SING_NOUN.has(k2) || (!!k3 && SING_NOUN.has(k3)) ||
+      (/^[ء-ي]{5,}$/.test(k) && (skel(k) === HYMN_SKEL || skel(k2) === HYMN_SKEL));       // ("ترنيمي" for «ترنيمة»)
   };
+  // «ترنيمة» as the speech engines heard it in a family's test on 26 Nov: Soniox wrote «تقريباً» every time (nine times),
+  // the local model «ترميمت» and «الترميم». They are words of their own too, so a hymn's name has to follow them as it is
+  // written for them to count.
+  const HYMN_MISHEARD = new Set(['تقريبا', 'التقريب', 'ترميم', 'الترميم', 'ترميمه', 'الترميمه', 'ترميمت']);
+  const isMisheardHymn = w => HYMN_MISHEARD.has(w) || HYMN_MISHEARD.has(w.replace(/^و(?=...)/, ''));
   const isConnect = w => CONNECT.has(w) || CONNECT.has(stripAl(w));
   // «مرنم ترنيمة», «النم ترنيمي»: «نرنم» misheard, believed only right beside the word for a hymn
   const nearWeSing = w => { const k = bare(w); return k.length >= 3 && k.length <= 6 && /^[ء-ي]+$/.test(k) && [...WE_SING_SKELS].some(x => lev1(skel(k), x)); };
@@ -1628,6 +1649,9 @@
     }
     return null;
   }
+  // A hymn is named or announced in these words («ترنيمة …», «نرنم …»): words of a verse in them are the hymn's name
+  // («ترنيمة باركي يا نفسي الرب» is not Psalm 104:35 said, 26 Nov), so they do not go up as the verse while being said.
+  const saysHymn = text => splitYa(normalize(text).split(' ').filter(Boolean)).some(w => isHymnNoun(w) || isWeSing(w));
   // … or the title comes first: «أجمل من كل الناس. آمين، تعالوا نقف ونرنم الترنيمة دي»
   function heraldAfter(words, e) {
     let we = false;
@@ -1823,7 +1847,7 @@
     // three times, two words heard as one or one as two, the end of a word cut off («قدوس قدوس هات صوت الملائ» and «قدوس،
     // ها صوت الملائكة» for «قدوس قدوس قدوس هاصوت الملائكة»). The first word must be the title's; then most of the letters,
     // in order, a word said again and again counted once. Best first.
-    near(q, limit) {
+    near(q, limit, min) {
       const once = ws => ws.filter((w, i) => i === 0 || w !== ws[i - 1]);
       const said = once(q.slice(0, 8)).join('');
       if (said.length < 10) return [];
@@ -1835,7 +1859,7 @@
           const sim = 1 - prefixDist(said, once(p).join('').slice(0, said.length + 8)) / said.length;
           if (sim > best) best = sim;
         }
-        if (best >= 0.7) out.push({ video: e.video, score: 5 * best, said: q.slice(0, 5).join(' '), whole: false });
+        if (best >= (min || 0.7)) out.push({ video: e.video, score: 5 * best, said: q.slice(0, 5).join(' '), whole: false });
       }
       return out.sort((a, b) => b.score - a.score).slice(0, limit || 6);
     }
@@ -1861,7 +1885,8 @@
     // Feed finished sentences. When a hymn is announced or named in this one, gives
     //   { kind: 'invite' | 'cue', heard: the words after the announcement, matches: [{ video, score, said }], repeat,
     //     close: nothing begins exactly like that, these are the nearest (a word of the title was heard differently),
-    //     named: it was called a hymn («ترنيمة …») and we were invited to sing it, and words of its own followed }
+    //     named: it was called a hymn («ترنيمة …») and we were invited to sing it, and words of its own followed,
+    //     titled: the word for a hymn came right before them («ترنيمة باركي يا نفسي الرب»): they are its name }
     // (matches may be empty: nothing in the database begins like that; when it was "named", a search elsewhere is
     //  worth offering). Otherwise null.
     process(text, now) {
@@ -1871,16 +1896,21 @@
       let res = null;
       // the last word that announces a hymn: in this sentence, or at the very end of the one before («… ونرنم الترنيمة دي»)
       for (let c = words.length - 1; c >= Math.max(0, from - 4) && !res; c--) {
-        if (!(isWeSing(words[c]) || isHymnNoun(words[c]))) continue;
+        const weak = !(isWeSing(words[c]) || isHymnNoun(words[c]));          // («ترنيمة» misheard, perhaps)
+        if (weak && !isMisheardHymn(words[c])) continue;
         if (this.done.has(this.base + c)) break;
         let q0 = c + 1;
-        while (q0 < words.length && (isAfterCue(words[q0]) || isWeSing(words[q0]) || isHymnNoun(words[q0]) || WE_OTHER.has(bare(words[q0])))) q0++;
+        while (q0 < words.length && (isAfterCue(words[q0]) || isWeSing(words[q0]) || isHymnNoun(words[q0]) || isMisheardHymn(words[q0]) || WE_OTHER.has(bare(words[q0])))) q0++;
         const q = words.slice(q0, q0 + 10);
         if (q.length < 2 || q0 + 2 <= from) continue;          // its title is not here yet, or it was all in the sentence before
         if (q.slice(0, 3).some(x => isHymnNoun(x) || isWeSing(x))) continue;      // («نسبح مع بعض في الترنيمة دي»: no title there)
-        this.done.add(this.base + c);
         let matches = this.lookup(q), close = false;
-        const near = this.near(q, 6);                // (the titles that sound like the words run together: always offered)
+        if (weak && !matches.length) continue;
+        this.done.add(this.base + c);
+        // «ترنيمة» right before the words: they are a hymn's name, so a title they come near is worth showing (not after
+        // «فيه ترنيمة بتقول …», where a hymn's line may be quoted)
+        const titled = !weak && isHymnNoun(words[q0 - 1]);
+        const near = weak ? [] : this.near(q, 6, titled ? 0.62 : 0.7);   // (the titles that sound like the words run together: always offered)
         if (!matches.length) { matches = this.lookup(q, 6, true); close = matches.length + near.length > 0; }
         const ids = new Set();
         matches = matches.concat(near).filter(m => !ids.has(m.video.id) && ids.add(m.video.id)).sort((a, b) => b.score - a.score).slice(0, 12);
@@ -1892,7 +1922,7 @@
         const key = matches.length ? matches[0].video.id : heard;
         const last = this.recent.get(key);
         this.recent.set(key, now);
-        res = { kind, heard, matches, close, named, repeat: !!(last && now - last < 5 * 60 * 1000) };
+        res = { kind, heard, matches, close, named, titled, repeat: !!(last && now - last < 5 * 60 * 1000) };
       }
       const keep = 24, drop = Math.max(0, words.length - keep);
       this.tail = words.slice(drop);
@@ -2154,15 +2184,17 @@
     // a finished sentence -> { found: the detector's cards, followed: the screen moved on with the reading }
     // late: it was heard a while ago (the speech model was loading meanwhile): cards for it, but nothing on the screen
     // seg: the engine's number for the sentence (its previews carry the same one)
-    final(text, late, seg) {
+    // o.hymn: a hymn was named in it and found (the console's song lists): its verse-like words are the hymn's name, not a
+    //   quote («ترنيمة باركي يا نفسي الرب»), so they make no verse card
+    final(text, late, seg, o) {
       const runs = langRuns((text || '').trim());
       const rd = this.runsDone && seg != null && this.runsDone.seg === seg ? this.runsDone : null;
       this.runsDone = null;
-      if (runs.length < 2 && !rd) return this._final1(text, late, seg);
+      if (runs.length < 2 && !rd) return this._final1(text, late, seg, o);
       // two languages in one sentence: each run in turn (not the ones already taken while it was being said)
       const out = { found: [], followed: false };
       for (let i = rd ? Math.min(rd.n, runs.length - 1) : 0; i < runs.length; i++) {
-        const r = this._final1(runs[i], late, seg == null ? null : seg + (i + 1) / 64);
+        const r = this._final1(runs[i], late, seg == null ? null : seg + (i + 1) / 64, o);
         out.found.push(...r.found);
         out.followed = out.followed || r.followed;
       }
@@ -2180,12 +2212,13 @@
       this.runsDone = { seg, n: last };
       this._interim1(runs[runs.length - 1], seg + (last + 1) / 64);
     }
-    _final1(text, late, seg) {
+    _final1(text, late, seg, o) {
       text = (text || '').trim();
       if (!text) return { found: [], followed: false };
       const T = this.now();
+      const notHymn = c => !(o && o.hymn && c.source === 'quote');
       if (late) {
-        const found = this.detector.processFinal(text, T);
+        const found = this.detector.processFinal(text, T).filter(notHymn);
         for (const c of found) this._card(c, { noAuto: true }, false);
         return { found, followed: false };
       }
@@ -2199,7 +2232,7 @@
       this._opening(text);
       this._stopped(text, true);
       const followed = this._readAlong(text, true);
-      const found = this.detector.processFinal(text, T).filter(c => this._card(c, followed ? { noAuto: true } : null, false) !== false);
+      const found = this.detector.processFinal(text, T).filter(notHymn).filter(c => this._card(c, followed ? { noAuto: true } : null, false) !== false);
       const cur = this.current;
       if (followed && cur && !cur.verseEnd && this.screenType === 'show') {
         // the same sentence was also found as a quote of the verse after it: the reader ran on, so both stay up
@@ -2262,7 +2295,7 @@
         this._stopped(text, false);
         const followed = this._readAlong(text, false);
         for (const c of this.detector.processInterim(text, this.now())) this._card(c, null, true);
-        if (!followed) this._quoteLive(text, seg);
+        if (!followed && !saysHymn(text)) this._quoteLive(text, seg);
       }
       this.inText = null;
     }

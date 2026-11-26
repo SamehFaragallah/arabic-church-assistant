@@ -60,6 +60,19 @@ const JOHN = 43, ROMANS = 45, PSALMS = 19, MATTHEW = 40;
     eq('reading on, a sentence a verse: none is skipped', k.covered(JOHN, 4), range(3, 12));
     eq('… and nothing else goes up', k.shows.every(s => s.ref.book === JOHN && s.ref.chapter === 4), true);
   }
+  // ---- a hymn named by a verse's words («ترنيمة باركي يا نفسي الرب», 26 Nov: "it brought the psalm — but I said hymn"):
+  //      the console found the hymn, so those words make no verse card; nor does a verse go up while they are being said
+  {
+    const words = VE.stripTashkeel(bible.verse(PSALMS, 103, 2)).replace(/[،.]/g, '');
+    const alone = desk();
+    alone.say(words);
+    const named = desk();
+    named.go(named.t + 6); named.d.final('ترنيمة ' + words, false, null, { hymn: true });
+    const live = desk();
+    live.read('ترنيمة ' + words, 0.4);
+    eq('a hymn named by a verse\'s words: no card for the verse (the words alone: Psalm 103:2), nothing on the screen',
+      [alone.cards.some(c => c.label === 'Psalms 103:2'), named.cards.length, named.shows.length, live.shows.length], [true, 0, 0, 0]);
+  }
   // ---- one sentence that runs from a verse into the next: both are up
   {
     const k = desk();

@@ -356,6 +356,20 @@ eq('is english', [VE.isEnglish('he became sin for us'), VE.isEnglish('يوحنا
   eq('search box: words anywhere in the title, spelling evened out', db().search('مالى سواك').map(v => v.id), ['s1', 's2']);
   eq('search box: a word that sounds the same', db().search('الفخار الاعظم').map(v => v.id), ['s4']);
   eq('search box: nothing', db().search('كلام مش موجود').length, 0);
+  // 26 Nov, a family trying the hymns: «ترنيمة» heard as other words, and names heard a word or two off
+  {
+    const more = titles.concat(['باركي يا نفسي الرب' + K, 'ما تعولش الهم وما تخافش' + K, 'على ضرب الأوتار بالهُتاف والتهليل' + K, 'مالناش غيرك انت' + K]);
+    const db2 = () => new VE.SongIndex(more.map((t, i) => ({ id: 's' + (i + 1), title: t })));
+    const id = t => 's' + (more.indexOf(t + K) + 1);
+    const first = r => (r && r.matches.length ? r.matches[0].video.id : null);
+    eq('Soniox wrote «تقريباً» for «ترنيمة»: a name said as it is written after it is the hymn', first(db2().process('تقريباً ما لناش غيرك أنت يا لهنا.', 1)), id('مالناش غيرك انت'));
+    eq('… «تقريباً» in everyday words, or before a name heard differently, is nothing', [db2().process('هو تقريباً ما بقاش فيه حد خالص', 1), db2().process('تقريباً ما تقعدش ليه', 1)], [null, null]);
+    eq('«ترنيمت على …» (the ة said as ت), and «ترميمت» as the local model heard it', [first(db2().process('ترنيمت على درب الأوطان', 1)), first(db2().process('ماشي هنحاول ترميمت على درب الأوتار', 1))],
+      [id('على ضرب الأوتار بالهُتاف والتهليل'), id('على ضرب الأوتار بالهُتاف والتهليل')]);
+    eq('«ترنيمة» right before a name heard a little off: the nearest, and it says so (the console shows it)', (r => [first(r), r.close, r.titled])(db2().process('ترنيمة باركي يا نفس الراب', 1)), [id('باركي يا نفسي الرب'), true, true]);
+    eq('… but not a hymn quoted in passing («فيه ترنيمة بتقول …»)', db2().process('فيه ترنيمة بتقول مستحق كل المادة يا يسوع', 1).titled, false);
+    eq('«لهم» for «الهم» (the article\'s alef swallowed)', first(db2().process('ترنيمة ما تقعدش لهم وما تخافش', 1)), id('ما تعولش الهم وما تخافش'));
+  }
 }
 
 // ---- quote matching with a couple of real Van Dyke verses planted in the fake Bible

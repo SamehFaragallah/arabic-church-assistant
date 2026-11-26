@@ -147,6 +147,8 @@
         <input id="ytInput" dir="auto" placeholder="Search all of YouTube… (ترنيمة, a song, a sermon)">
         <button class="btn btn-small" type="submit" id="ytGo">Search YouTube</button>
       </form>
+      <!-- while the search is being typed: words most hymn searches need, put in where the cursor is -->
+      <div id="ytWords" class="yt-words" hidden><span>Add</span><button type="button" class="btn btn-small" data-w="ترنيمه">ترنيمه</button><button type="button" class="btn btn-small" data-w="كلمه ولحن">كلمه ولحن</button></div>
       <div id="ytResults" class="yt-results" hidden></div>
       <div id="videoMentioned" class="video-mentioned" hidden><h3 class="picker-group">Just mentioned</h3><div id="videoMentionedList"></div></div>
       <div id="playlists" class="playlists"></div>

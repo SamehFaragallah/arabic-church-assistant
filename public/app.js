@@ -4,6 +4,17 @@
   const VE = window.VerseEngine;
   const $ = s => document.querySelector(s);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // A word put into a text box where its cursor is, with a space before and after it where one is needed (and after it at
+  // the end, ready for the next word); the cursor goes on after it.
+  function insertAtCursor(box, word) {
+    const v = box.value, a = box.selectionStart == null ? v.length : box.selectionStart, b = box.selectionEnd == null ? a : box.selectionEnd;
+    const before = v.slice(0, a), after = v.slice(b);
+    const text = (before && !/\s$/.test(before) ? ' ' : '') + word + (/^\s/.test(after) ? '' : ' ');
+    box.value = before + text + after;
+    box.focus();
+    box.setSelectionRange(a + text.length, a + text.length);
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+  }
   const desktop = window.vfDesktop || null;          // the desktop app's extras (electron/preload.js)
 
   // ================================================================ server API
@@ -199,9 +210,10 @@
     text = (text || '').trim();
     if (!text || !director) return;
     setInterim('');
-    const { found } = director.final(text, late, seg);    // cards and screen changes come back through addCard / putOnScreen
-    const vids = handleVideos(text);
-    addFinal(text, found, vids, lang || (VE.isEnglish(text) ? 'en' : 'ar'));
+    // (hymns first: a hymn named in the sentence makes its verse-like words its name, not a verse quoted)
+    const hymns = handleVideos(text);
+    const { found } = director.final(text, late, seg, hymns.named ? { hymn: true } : null);    // cards and screen changes come back through addCard / putOnScreen
+    addFinal(text, found, hymns.found, lang || (VE.isEnglish(text) ? 'en' : 'ar'));
   }
   function handleInterim(text, seg) {
     setInterim(text);
@@ -327,14 +339,17 @@
     renderPlaylists();
     renderVideoList();
   }
+  // -> { found: the playlist videos mentioned, named: a hymn was named or announced and found (a card was made for it) }
   function handleVideos(text) {
-    if (settings.videoDetect === false) return [];
+    if (settings.videoDetect === false) return { found: [], named: false };
     const found = videoMatcher ? videoMatcher.process(text) : [];
     // A hymn announced or named that is not in these playlists: what the song database has by that name, as a card to
     // pick from (it never plays by itself). Nothing in the database either, and it was clearly announced: the card
     // offers to look on YouTube.
     const said = songIndex ? songIndex.process(text) : null;
-    if (said && !found.some(m => m.cued) && (said.close ? said.kind === 'invite' : said.matches.length || said.named)) {
+    // (a near title too when «ترنيمة» came right before the words: «ترنيمة باركي يا نفس الراب»)
+    const saidShown = !!(said && !found.some(m => m.cued) && (said.close ? said.kind === 'invite' || said.titled : said.matches.length || said.named));
+    if (saidShown) {
       addSongsCard(said);
       api.post('/api/hymn', { heard: said.heard, how: said.kind === 'invite' ? 'announced' : 'named', found: said.matches.length, title: said.matches.length ? said.matches[0].video.title : '',
         songs: said.matches.slice(0, 6).map(m => ({ id: m.video.id, title: m.video.title })) }).catch(() => {});   // (the phone lists them too)
@@ -360,7 +375,7 @@
       api.post('/api/hymn', { id: m.video.id, title: m.video.title, heard: m.phrase, how: m.invited ? 'announced' : m.cued ? 'named' : 'said', played, mine: true }).catch(() => {});
     }
     if (found.length) renderVideoList();
-    return found;
+    return { found, named: found.some(m => m.cued) || (saidShown && said.matches.length > 0) };
   }
   // ---- the song database (data\songs.json): every title of whole playlists and channels
   let songIndex = null, songSources = [];
@@ -434,7 +449,7 @@
       row.querySelector('.btn-primary').addEventListener('click', () => el.classList.add('shown'));
       list.appendChild(row);
     }
-    el.querySelector('.sc-yt').onclick = () => { selectTab('videos'); $('#ytInput').value = a.heard; youtubeSearch(a.heard); };
+    el.querySelector('.sc-yt').onclick = () => { selectTab('videos'); $('#ytInput').value = a.heard; $('#ytInput').dispatchEvent(new Event('input')); youtubeSearch(a.heard); };
     el.querySelector('.x').onclick = () => el.remove();
     cardsEl.prepend(el);
     el.classList.add('fresh');
@@ -1255,6 +1270,16 @@
     };
     $('#videoFilter').oninput = renderVideoList;
     $('#ytForm').onsubmit = e => { e.preventDefault(); const q = $('#ytInput').value.trim(); if (q) youtubeSearch(q); };
+    // «ترنيمه» and «كلمه ولحن» while the search is typed: put in where the cursor is (the box keeps the cursor)
+    {
+      const box = $('#ytInput'), words = $('#ytWords');
+      const show = () => { words.hidden = !(document.activeElement === box || box.value.trim()); };
+      box.addEventListener('focus', show);
+      box.addEventListener('input', show);
+      box.addEventListener('blur', () => setTimeout(show, 200));
+      words.addEventListener('mousedown', e => { if (e.target.closest('button')) e.preventDefault(); });
+      words.addEventListener('click', e => { const b = e.target.closest('button[data-w]'); if (b) insertAtCursor(box, b.dataset.w); });
+    }
     $('#videoFilter').onkeydown = e => {
       const f = VE.normalize(e.target.value || '');
       if (e.key !== 'Enter' || !f) return;

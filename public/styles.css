@@ -261,6 +261,9 @@ textarea:focus { outline: none; border-color: var(--gold); }
 .tabs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
 .tab { white-space: nowrap; }
 .yt-search { margin-top: 8px; }
+.yt-words { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; margin-top: -2px; }
+.yt-words span { color: var(--muted); font-size: 12px; }
+.yt-words .btn { font: 15px/1.3 var(--ar); padding: 3px 12px; border-radius: 999px; }
 .yt-results { margin: 0 12px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); max-height: 50%; overflow-y: auto; }
 .yt-results .video-row { margin: 6px; }
 .video-mentioned { margin: 0 12px 8px; padding: 4px 8px 8px; border: 1px solid var(--gold); border-radius: 10px; background: var(--gold-soft); }

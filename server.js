@@ -613,10 +613,12 @@ function hardwareInfo() {
     localReady: hardware.localReady, torchGpu: hardware.torchGpu, auto: autoProvider(), provider: speechProvider(), platform: process.platform };
 }
 const cloudKey = () => (PAID.includes(speechProvider()) ? secrets[speechProvider() + 'Key'] || '' : '');
-// words to listen out for (cloud services that take a hint list): the books of the Bible and the hymn titles
+// words to listen out for (cloud services that take a hint list): the words that name a hymn, the books of the Bible and
+// the hymn titles. (Without «ترنيمة» in the list Soniox wrote it «تقريباً» every time in a family's test on 26 Nov; with it,
+// every time right.)
 function keyterms() {
   const VE = require('./public/engine.js');
-  const out = VE.BOOKS.map(b => b.ar.replace(/[\u064B-\u0652]/g, ''));
+  const out = ['ترنيمة', 'ترانيم', 'نرنم'].concat(VE.BOOKS.map(b => b.ar.replace(/[\u064B-\u0652]/g, '')));
   for (const p of videoLib.playlists) for (const v of p.videos || []) { const t = (VE.splitTitle(v.title)[0] || '').trim(); if (t && t.length <= 40) out.push(t); }
   return [...new Set(out)].slice(0, 100);
 }
