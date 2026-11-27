@@ -189,26 +189,11 @@
       fill(entext, s.en, false);
       if (s.enVersion) { const v = document.createElement('span'); v.className = 'ver'; v.textContent = s.enVersion; entext.appendChild(v); }
       entext.hidden = false;
-      if (s.fumsId) reportFums(s.fumsId);
       if (c.showEnglish === false) window.VF_loadCss('en');
     } else entext.hidden = true;
     fit();
   }
-  // API.Bible asks apps to report each time its copyrighted text is shown (FUMS)
-  let fumsLoaded = null;
-  function reportFums(id) {
-    if (inFrame || q.get('sample')) return;
-    if (!fumsLoaded) {
-      fumsLoaded = new Promise(res => {
-        window._BAPI = window._BAPI || {};
-        const sc = document.createElement('script');
-        sc.src = 'https://cdn.scripture.api.bible/fums/fumsv2.min.js';
-        sc.onload = res; sc.onerror = res;
-        document.head.appendChild(sc);
-      });
-    }
-    fumsLoaded.then(() => { try { if (window._BAPI && window._BAPI.t) window._BAPI.t(id); } catch (e) { /* ignore */ } });
-  }
+  // (each time API.Bible's text goes on the screen, the app reports it to them: fumsReport in server.js)
 
   let swapTimer = null;
   function render(s) {

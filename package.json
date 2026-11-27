@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "server": "node server.js --open",
-    "test": "node test/engine.test.js && node test/youtube.test.js && node test/detect.test.js && node test/director.test.js",
+    "test": "node test/engine.test.js && node test/youtube.test.js && node test/detect.test.js && node test/director.test.js && node test/english.test.js",
     "test:engine": "if exist engine\\python\\python.exe (engine\\python\\python.exe test\\engine_faults.py) else (engine\\.venv\\Scripts\\python.exe test\\engine_faults.py)"
   },
   "devDependencies": {

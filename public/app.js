@@ -147,7 +147,7 @@
       try {
         let j = enCache.get(key);
         if (!j) { j = await withTimeout(api.get(`/api/verse-en?b=${r.book}&c=${r.chapter}&v=${r.verse}&e=${e}`), 4000); enCache.set(key, j); if (enCache.size > 200) enCache.delete(enCache.keys().next().value); }
-        if (j && j.verses && j.verses.length) { clearBanner('english'); return { verses: j.verses, version: j.version, fumsId: j.fumsId || null }; }
+        if (j && j.verses && j.verses.length) { clearBanner('english'); return { verses: j.verses, version: j.version, fumsToken: j.fumsToken || null }; }
       } catch (err) {
         if (quiet) return null;
         banner(`Couldn't get the ${esc(onlineName())} text (${esc(err.message)}), so the ${esc(bibleEnVersion.toUpperCase())} is shown instead. Check Settings → English on screen.`, 'info', 'english', 12000);
@@ -664,7 +664,7 @@
     if (current !== r) return;   // something else was shown while the English text was loading
     const payload = {
       ref: r, label: VE.refLabel(r), labelEn: VE.refLabel(r, { lang: 'en' }),
-      verses: rangeText(r), en: en ? en.verses : null, enVersion: en ? en.version : '', fumsId: en && en.fumsId || null,
+      verses: rangeText(r), en: en ? en.verses : null, enVersion: en ? en.version : '', fumsToken: en && en.fumsToken || null,
       forceEnglish, why,
     };
     try { await api.post('/api/show', payload); } catch { lost(); }

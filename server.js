@@ -403,6 +403,8 @@ const sameScreen = (a, b) => a.type === b.type && (a.type === 'clear' || (a.type
 function setScreen(next, why) {
   const same = sameScreen(screen, next);
   if (same && next.type === 'clear') return;
+  // API.Bible's text going on the screen (or its English coming to a verse that is up): a view, reported to them
+  if (next.type === 'show' && next.fumsToken && (!same || screen.fumsToken !== next.fumsToken)) fumsReport(next.fumsToken);
   if (!same && screen.type !== 'video') { screenStack.push(screen); if (screenStack.length > 10) screenStack.shift(); }
   screen = Object.assign({}, next, { at: Date.now() });
   broadcast('screen', screen);
@@ -423,6 +425,7 @@ function screenBack() {
   if (!prev) return false;
   screen = Object.assign({}, prev, { at: Date.now(), back: true });
   if (screen.type === 'show') screen.why = 'back';
+  if (screen.type === 'show' && screen.fumsToken) fumsReport(screen.fumsToken);
   broadcast('screen', screen);
   recordScreen('back');
   return true;
@@ -1153,9 +1156,9 @@ async function refreshSongs(onlyStale, id) {
 }
 
 // =====================================================================================
-// English on screen: built-in translations (KJV, BSB, WEB, ASV), or ESV / API.Bible (NIV, NKJV…)
-// fetched verse by verse with the church's own free key. At most 500 verses are kept in memory,
-// as the ESV terms require.
+// English on screen: built-in translations (KJV, BSB, WEB, ASV), or ESV / API.Bible (NIV, NKJV…) with the church's own
+// free key. The ESV is fetched verse by verse and at most 500 verses are kept in memory, as its terms require; API.Bible a
+// chapter at a time, kept on this PC (below).
 // =====================================================================================
 const ESV_BASE = process.env.ESV_API_BASE || 'https://api.esv.org';
 const APIBIBLE_BASE = process.env.APIBIBLE_BASE || 'https://rest.api.bible';
@@ -1192,32 +1195,145 @@ async function esvVerses(b, c, v1, v2) {
   return { version: 'ESV', verses };
 }
 
+// ---- API.Bible a chapter at a time, kept on this PC (begin: test/english.test.js runs this part on its own)
+// A whole chapter is fetched at once (no slower than one verse, and the rest of a reading is then at hand) and kept in
+// data\english-cache.json the way API.Bible's terms allow: fetched again after 28 days (they ask for 30 at most), never more
+// than 450 verses in a row (they allow fewer than 500), not more than 2,000 chapters. Each time its text goes on the screen
+// it is reported to API.Bible's Fair Use system (fumsReport) with the token of the answer it came in.
+const AB_CACHE_FILE = path.join(DATA, 'english-cache.json');
+const AB_KEEP_MS = 28 * 24 * 3600 * 1000, AB_RUN_MAX = 450;
+const abChapters = new Map();       // "<bible id>:43.3" -> { at, f: its token, n: its verses, text: Map(verse -> text) }
+const abPending = new Map();        // a chapter being fetched -> Promise
+// A whole translation kept on this PC, downloaded with its publisher's permission (data\english\<bible id>.json, the same
+// as the Pi's): every verse comes from it, nothing is fetched (views are still reported, with each chapter's token)
+const AB_FULL_DIR = path.join(DATA, 'english');
+const abFull = new Map();           // bible id -> Map("43.3" -> { f, n, text }) or null (looked for: not on this PC)
+function abFullFor(id) {
+  if (abFull.has(id)) return abFull.get(id);
+  let m = null;
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(AB_FULL_DIR, String(id).replace(/[^\w.-]/g, '') + '.json'), 'utf8'));
+    m = new Map();
+    for (const [k, e] of Object.entries((j && j.chapters) || {})) {
+      if (e && Array.isArray(e.verses) && e.verses.length) m.set(k, { f: e.f || null, n: Math.max(...e.verses.map(x => x[0])), text: new Map(e.verses) });
+    }
+    if (!m.size) m = null;
+  } catch { /* not downloaded */ }
+  abFull.set(id, m);
+  return m;
+}
+let abSaveTimer = null;
+const abChapterCount = b => { const B = remoteBible(); return B ? B.bible.chapterCount(b) : 150; };
+function abFresh(id, b, c) { const e = abChapters.get(`${id}:${b}.${c}`); return e && Date.now() - e.at < AB_KEEP_MS ? e : null; }
+function abChapter(id, b, c) {
+  const have = abFresh(id, b, c);
+  if (have) return Promise.resolve(have);
+  const key = `${id}:${b}.${c}`;
+  if (abPending.has(key)) return abPending.get(key);             // (asked for already: the same answer)
+  const p = abFetch(id, b, c).finally(() => abPending.delete(key));
+  abPending.set(key, p);
+  return p;
+}
+async function abFetch(id, b, c) {
+  const url = `${APIBIBLE_BASE}/v1/bibles/${encodeURIComponent(id)}/chapters/${USFM[b - 1]}.${c}` +
+    '?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=true&include-verse-spans=false';
+  const r = await fetchWithTimeout(url, 8000, { headers: { 'api-key': bibleKey('apiBibleKey') } });
+  if (r.status === 401 || r.status === 403) throw new Error('API.Bible did not accept the key, or this translation is not included in your API.Bible plan.');
+  if (r.status === 404) throw new Error('API.Bible has no such chapter in this translation.');
+  if (!r.ok) throw new Error('API.Bible answered with error ' + r.status);
+  const j = await r.json();
+  const parts = String((j.data && j.data.content) || '').split(/\[(\d+)\]/);       // "[1] There is therefore … [2] For …"
+  const verses = [];
+  for (let i = 1; i < parts.length; i += 2) { const t = parts[i + 1].replace(/\s+/g, ' ').trim(); if (t) verses.push([+parts[i], t]); }
+  if (!verses.length) throw new Error('API.Bible returned no text for that chapter.');
+  const e = abKeep(id, b, c, verses, (j.meta && (j.meta.fumsToken || j.meta.fumsId)) || null, Date.now());
+  abSaveSoon();
+  return e;
+}
+function abKeep(id, b, c, verses, f, at) {
+  const e = { at, f, n: Math.max(...verses.map(x => x[0])), text: new Map(verses) };
+  abChapters.set(`${id}:${b}.${c}`, e);
+  abTrim(id, b, c);
+  return e;
+}
+// (the chapters next to each other around this one, across books too, lose the ones at the far end until the run is short enough)
+function abTrim(id, b, c) {
+  const kept = ([x, y]) => abChapters.get(`${id}:${x}.${y}`);
+  const prev = ([x, y]) => (y > 1 ? [x, y - 1] : x > 1 ? [x - 1, abChapterCount(x - 1)] : null);
+  const next = ([x, y]) => (y < abChapterCount(x) ? [x, y + 1] : x < 66 ? [x + 1, 1] : null);
+  const run = [[b, c]];
+  for (let p = prev([b, c]); p && kept(p); p = prev(p)) run.unshift(p);
+  for (let q = next([b, c]); q && kept(q); q = next(q)) run.push(q);
+  let total = run.reduce((s, x) => s + kept(x).n, 0);
+  while (total > AB_RUN_MAX && run.length > 1) {
+    const at = run.findIndex(x => x[0] === b && x[1] === c);
+    const drop = at > run.length - 1 - at ? run.shift() : run.pop();
+    total -= kept(drop).n;
+    abChapters.delete(`${id}:${drop[0]}.${drop[1]}`);
+  }
+  if (abChapters.size > 2000) for (const [k] of [...abChapters.entries()].sort((x, y) => x[1].at - y[1].at).slice(0, 200)) abChapters.delete(k);
+}
+// the kept chapters, read at the start (those older than 28 days are left out: fetched again when wanted)
+function abRead() {
+  let j;
+  try { j = JSON.parse(fs.readFileSync(AB_CACHE_FILE, 'utf8')); } catch { return; }
+  for (const [key, e] of Object.entries((j && j.chapters) || {})) {
+    const m = /^(.+):(\d+)\.(\d+)$/.exec(key);
+    if (m && e && Array.isArray(e.verses) && e.verses.length && Date.now() - e.at < AB_KEEP_MS) abKeep(m[1], +m[2], +m[3], e.verses, e.f || null, e.at);
+  }
+}
+function abSaveSoon() {
+  if (abSaveTimer) return;
+  abSaveTimer = setTimeout(() => {
+    abSaveTimer = null;
+    const chapters = {};
+    for (const [key, e] of abChapters) if (Date.now() - e.at < AB_KEEP_MS) chapters[key] = { at: e.at, f: e.f, verses: [...e.text.entries()] };
+    const tmp = AB_CACHE_FILE + '.tmp';
+    try { fs.writeFileSync(tmp, JSON.stringify({ v: 1, chapters })); fs.renameSync(tmp, AB_CACHE_FILE); } catch { /* kept in memory only */ }
+  }, 2000);
+  if (abSaveTimer.unref) abSaveTimer.unref();
+}
 async function apiBibleVerses(b, c, v1, v2) {
   if (!bibleKey('apiBibleKey') || !settings.apiBibleId) throw new Error('Choose the API.Bible translation in Settings → English on screen.');
+  const id = settings.apiBibleId, name = settings.apiBibleAbbr || 'API.Bible', full = abFullFor(id);
+  const e = (full && full.get(`${b}.${c}`)) || await abChapter(id, b, c);
+  // (near the end of the chapter, the next one is fetched before it is needed)
+  if (!full && v2 + 3 > e.n) { const nx = c < abChapterCount(b) ? [b, c + 1] : b < 66 ? [b + 1, 1] : null; if (nx) abChapter(id, nx[0], nx[1]).catch(() => {}); }
   const verses = [];
-  let fumsId = null;
-  for (let v = v1; v <= v2; v++) {
-    const k = `ab:${settings.apiBibleId}:${b}.${c}.${v}`;
-    let hit = cacheGet(k);
-    if (hit === undefined) {
-      const url = `${APIBIBLE_BASE}/v1/bibles/${encodeURIComponent(settings.apiBibleId)}/verses/${USFM[b - 1]}.${c}.${v}` +
-        '?content-type=text&include-notes=false&include-titles=false&include-chapter-numbers=false&include-verse-numbers=false&include-verse-spans=false';
-      const r = await fetchWithTimeout(url, 8000, { headers: { 'api-key': bibleKey('apiBibleKey') } });
-      if (r.status === 401 || r.status === 403) throw new Error('API.Bible did not accept the key, or this translation is not included in your API.Bible plan.');
-      if (r.status === 404) hit = { t: '', f: null };
-      else {
-        if (!r.ok) throw new Error('API.Bible answered with error ' + r.status);
-        const j = await r.json();
-        hit = { t: String((j.data && j.data.content) || '').replace(/\s+/g, ' ').trim(), f: (j.meta && j.meta.fumsId) || null };
-      }
-      cachePut(k, hit);
-    }
-    if (hit.t) verses.push({ n: v, text: hit.t });
-    fumsId = hit.f || fumsId;
-  }
-  if (!verses.length) throw new Error('API.Bible returned no text for that verse.');
-  return { version: settings.apiBibleAbbr || 'API.Bible', verses, fumsId };
+  for (let v = v1; v <= v2; v++) { const t = e.text.get(v); if (t) verses.push({ n: v, text: t }); }
+  if (!verses.length) throw new Error(`The ${name} does not have this verse.`);
+  return { version: name, verses, fumsToken: e.f };
 }
+// The first request to API.Bible after a start is the slowest (finding the server, the secure connection): it is made at the
+// start (the translation's details, no text), not with the first verse
+function abWarm() {
+  if (settings.englishVersion !== 'apibible' || !settings.apiBibleId || !bibleKey('apiBibleKey') || abFullFor(settings.apiBibleId)) return;
+  fetchWithTimeout(`${APIBIBLE_BASE}/v1/bibles/${encodeURIComponent(settings.apiBibleId)}`, 10000, { headers: { 'api-key': bibleKey('apiBibleKey') } })
+    .then(r => r.arrayBuffer()).catch(() => {});
+}
+// API.Bible's Fair Use reports (FUMS v3): text put on the screen, by the token of the answer it came in, with this PC's own
+// random id (data\fums-device.txt) and one for this run, no names; a few go together a moment later
+const FUMS_BASE = process.env.FUMS_BASE || 'https://fums.api.bible';
+const fums = { queue: [], timer: null, device: '', session: crypto.randomUUID() };
+function fumsReport(token) {
+  if (!token) return;
+  if (!fums.device) {
+    const f = path.join(DATA, 'fums-device.txt');
+    try { fums.device = fs.readFileSync(f, 'utf8').trim(); } catch { /* the first time */ }
+    if (!/^[\w-]{8,64}$/.test(fums.device)) { fums.device = crypto.randomUUID(); try { fs.writeFileSync(f, fums.device + '\n'); } catch { /* a new one next time */ } }
+  }
+  fums.queue.push(token);
+  if (!fums.timer) fums.timer = setTimeout(fumsSend, 3000);
+}
+async function fumsSend() {
+  fums.timer = null;
+  const tokens = fums.queue.splice(0, 25);
+  if (!tokens.length) return;
+  const q = tokens.map(t => 't=' + encodeURIComponent(t)).join('&') + `&dId=${fums.device}&sId=${fums.session}`;
+  try { await fetchWithTimeout(`${FUMS_BASE}/f3?${q}`, 8000); } catch { /* offline: not reported */ }
+  if (fums.queue.length && !fums.timer) fums.timer = setTimeout(fumsSend, 3000);
+}
+// ---- API.Bible (end)
 async function apiBibleList(key) {
   const r = await fetchWithTimeout(`${APIBIBLE_BASE}/v1/bibles?language=eng`, 12000, { headers: { 'api-key': key } });
   if (r.status === 401 || r.status === 403) throw new Error('API.Bible did not accept that key.');
@@ -1887,6 +2003,7 @@ function start() {
       pruneOld(LOG_DIR, 60, /^\d{4}-\d{2}-\d{2}\.log$/);
       pruneOld(RECORD_DIR, 7 * settings.recordKeepWeeks, /\.(ogg|opus|wav)$/);
       history('start', { version: VERSION });
+      abRead(); abWarm();                // (API.Bible's chapters kept on this PC; the first request to it made now)
       log(`Arabic Church Assistant ${VERSION} started (port ${port}).`);
       speech.start();
       startHttps();

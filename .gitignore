@@ -15,6 +15,11 @@ data/phrases.json
 data/remote-cert.pfx
 data/remote-*.pem
 data/*.tmp
+# API.Bible's text kept on this PC (theirs: never in the code or the download), and this PC's anonymous id for their reports
+data/english-cache.json
+data/fums-device.txt
+# whole translations downloaded with their publishers' permission, for this church only
+data/english/
 
 # Downloaded or made by Setup.bat and the app (dist/: the Mac build, macos/build.sh)
 bin/
